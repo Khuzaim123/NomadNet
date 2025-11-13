@@ -1,22 +1,28 @@
 const nodemailer = require('nodemailer');
 
-// Email configuration (hardcoded for now)
+// Email configuration from environment variables
 const EMAIL_CONFIG = {
-  host: process.env.SMTP_HOST,              // ✅ From .env
-  port: parseInt(process.env.SMTP_PORT),    // ✅ From .env
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT),
   secure: process.env.SMTP_SECURE === 'true',
   auth: {
-    user: process.env.SMTP_USER,            // ✅ From .env
-    pass: process.env.SMTP_PASS             // ✅ From .env
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
   }
 };
 
-const FROM_EMAIL = process.env.FROM_EMAIL;  // ✅ From .env
-const FROM_NAME = process.env.FROM_NAME;    // ✅ From .env
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'; 
+const FROM_EMAIL = process.env.FROM_EMAIL;
+const FROM_NAME = process.env.FROM_NAME;
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
 // Create reusable transporter
 const createTransporter = () => {
+  // Check if email is configured
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('⚠️  Email not configured. Emails will be logged to console only.');
+    return null;
+  }
+
   return nodemailer.createTransport(EMAIL_CONFIG);
 };
 
@@ -24,6 +30,16 @@ const createTransporter = () => {
 const sendEmail = async (options) => {
   try {
     const transporter = createTransporter();
+
+    // If no transporter (email not configured), just log
+    if (!transporter) {
+      console.log('\n📧 ========== EMAIL (DEV MODE) ==========');
+      console.log('To:', options.email);
+      console.log('Subject:', options.subject);
+      console.log('Message:', options.message || options.html);
+      console.log('=========================================\n');
+      return { success: true, messageId: 'dev-mode' };
+    }
 
     const mailOptions = {
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
@@ -41,7 +57,7 @@ const sendEmail = async (options) => {
       messageId: info.messageId
     };
   } catch (error) {
-    console.error('❌ Email error:', error);
+    console.error('❌ Email error:', error.message);
     return {
       success: false,
       error: error.message
@@ -138,7 +154,7 @@ const emailTemplates = {
     `
   }),
 
-  // Welcome Email (after verification)
+  // Welcome Email
   welcome: (username) => ({
     subject: '🎉 Welcome to the NomadNet Community!',
     html: `

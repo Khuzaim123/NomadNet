@@ -1,5 +1,4 @@
 const cloudinary = require('../config/cloudinary');
-const streamifier = require('streamifier');
 
 /**
  * Upload image buffer to Cloudinary
@@ -29,7 +28,12 @@ const uploadToCloudinary = (buffer, folder = 'nomadnet/avatars', publicId = null
       }
     );
 
-    streamifier.createReadStream(buffer).pipe(uploadStream);
+    // Convert buffer to stream and pipe to cloudinary
+    const Readable = require('stream').Readable;
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
+    stream.pipe(uploadStream);
   });
 };
 
