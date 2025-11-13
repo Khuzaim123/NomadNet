@@ -1,16 +1,11 @@
-const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
-// Generate random token
-const generateRandomToken = () => {
-  return crypto.randomBytes(32).toString('hex');
+const generateToken = (id) => {
+  return jwt.sign(
+    { id }, 
+    process.env.JWT_SECRET,  // ✅ Updated
+    { expiresIn: process.env.JWT_EXPIRE || '7d' }  // ✅ Updated
+  );
 };
 
-// Hash token (for storing in database)
-const hashToken = (token) => {
-  return crypto.createHash('sha256').update(token).digest('hex');
-};
-
-module.exports = {
-  generateRandomToken,
-  hashToken
-};
+module.exports = generateToken;

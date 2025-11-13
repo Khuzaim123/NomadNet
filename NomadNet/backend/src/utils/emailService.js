@@ -2,17 +2,18 @@ const nodemailer = require('nodemailer');
 
 // Email configuration (hardcoded for now)
 const EMAIL_CONFIG = {
-  host: 'smtp.gmail.com', // or smtp.mailtrap.io for testing
-  port: 587,
-  secure: false,
+  host: process.env.SMTP_HOST,              // ✅ From .env
+  port: parseInt(process.env.SMTP_PORT),    // ✅ From .env
+  secure: process.env.SMTP_SECURE === 'true',
   auth: {
-    user: 'TheNomandNet@gmail.com', // Change this
-    pass: 'wmzz fywa ucpd itng' // Change this (use App Password for Gmail)
+    user: process.env.SMTP_USER,            // ✅ From .env
+    pass: process.env.SMTP_PASS             // ✅ From .env
   }
 };
 
-const FROM_EMAIL = 'noreply@nomadnet.com';
-const FROM_NAME = 'NomadNet';
+const FROM_EMAIL = process.env.FROM_EMAIL;  // ✅ From .env
+const FROM_NAME = process.env.FROM_NAME;    // ✅ From .env
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'; 
 
 // Create reusable transporter
 const createTransporter = () => {
@@ -188,7 +189,7 @@ const emailTemplates = {
 
 // Send verification email
 const sendVerificationEmail = async (email, username, verificationToken) => {
-  const verificationUrl = `http://localhost:3000/verify-email/${verificationToken}`;
+  const verificationUrl = `${CLIENT_URL}/verify-email/${verificationToken}`;
   const template = emailTemplates.emailVerification(username, verificationUrl);
   
   return await sendEmail({
@@ -200,7 +201,7 @@ const sendVerificationEmail = async (email, username, verificationToken) => {
 
 // Send password reset email
 const sendPasswordResetEmail = async (email, username, resetToken) => {
-  const resetUrl = `http://localhost:3000/reset-password/${resetToken}`;
+  const resetUrl = `${CLIENT_URL}/reset-password/${resetToken}`;
   const template = emailTemplates.passwordReset(username, resetUrl);
   
   return await sendEmail({
