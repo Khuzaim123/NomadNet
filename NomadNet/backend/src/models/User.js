@@ -19,7 +19,7 @@ const UserSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'Please add a password'],
-    minlength: 6,
+    minlength: 8,
     select: false
   },
 
@@ -88,11 +88,9 @@ const UserSchema = new mongoose.Schema({
     type: {
       type: String,
       enum: ['Point'],
-      default: 'Point'
     },
     coordinates: {
-      type: [Number], // [longitude, latitude]
-      index: '2dsphere'
+      type: [Number],
     }
   },
   homeCountry: {
@@ -137,7 +135,7 @@ const UserSchema = new mongoose.Schema({
   },
 
   // ======================
-  // ✅ Verification
+  // ✅ Verification (UPDATED FOR OTP)
   // ======================
   isVerified: {
     type: Boolean,
@@ -152,14 +150,26 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  emailVerificationToken: String,
-  emailVerificationExpire: Date,
+  
+  // ✅ OTP Fields
+  otp: String,
+  otpExpire: Date,
+  otpAttempts: {
+    type: Number,
+    default: 0
+  },
+  otpLastSent: Date,
 
   // ======================
-  // 🔁 Password Reset
+  // 🔁 Password Reset (USING OTP)
   // ======================
-  passwordResetToken: String,
-  passwordResetExpire: Date,
+  passwordResetOTP: String,
+  passwordResetOTPExpire: Date,
+  
+  // ======================
+  // 🔄 Temp Password Storage
+  // ======================
+  tempPassword: String, // For password change verification
 
   // ======================
   // 🚫 Safety
@@ -182,10 +192,11 @@ const UserSchema = new mongoose.Schema({
 // ======================
 // ⚡ Indexes
 // ======================
-UserSchema.index({ currentLocation: '2dsphere' });
-UserSchema.index({ username: 1, email: 1 });
-UserSchema.index({ currentCity: 1, isOnline: 1 });
-UserSchema.index({ skills: 1, interests: 1 });
+UserSchema.index({ currentLocation: '2dsphere' }, { sparse: true });
+UserSchema.index({ username: 1 });
+UserSchema.index({ email: 1 });
+UserSchema.index({ currentCity: 1 });
+UserSchema.index({ isOnline: 1 });
 
 // ======================
 // 🔑 Password Hashing
@@ -214,26 +225,78 @@ UserSchema.methods.updateActivity = function() {
   return this.save();
 };
 
-// Generate email verification token (valid for 24h)
-UserSchema.methods.generateEmailVerificationToken = function() {
-  const verificationToken = crypto.randomBytes(32).toString('hex');
-  this.emailVerificationToken = crypto
-    .createHash('sha256')
-    .update(verificationToken)
-    .digest('hex');
-  this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-  return verificationToken;
+// ✅ Generate OTP for email verification (6 digits, valid for 10 minutes)
+UserSchema.methods.generateOTP = function() {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+  
+  this.otp = crypto.createHash('sha256').update(otp).digest('hex');
+  this.otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+  this.otpLastSent = Date.now();
+  
+  return otp; // Return plain OTP to send via email
 };
 
-// Generate password reset token (valid for 1h)
-UserSchema.methods.generatePasswordResetToken = function() {
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  this.passwordResetToken = crypto
-    .createHash('sha256')
-    .update(resetToken)
-    .digest('hex');
-  this.passwordResetExpire = Date.now() + 60 * 60 * 1000; // 1 hour
-  return resetToken;
+// ✅ Verify OTP
+UserSchema.methods.verifyOTP = function(enteredOTP) {
+  if (!this.otp || !this.otpExpire) {
+    return { success: false, message: 'No OTP found. Please request a new one.' };
+  }
+
+  if (Date.now() > this.otpExpire) {
+    return { success: false, message: 'OTP has expired. Please request a new one.' };
+  }
+
+  const hashedOTP = crypto.createHash('sha256').update(enteredOTP).digest('hex');
+  
+  if (hashedOTP !== this.otp) {
+    this.otpAttempts += 1;
+    
+    if (this.otpAttempts >= 5) {
+      this.otp = undefined;
+      this.otpExpire = undefined;
+      return { success: false, message: 'Too many failed attempts. Please request a new OTP.' };
+    }
+    
+    return { success: false, message: `Invalid OTP. ${5 - this.otpAttempts} attempts remaining.` };
+  }
+
+  return { success: true };
+};
+
+// ✅ Generate Password Reset OTP
+UserSchema.methods.generatePasswordResetOTP = function() {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  
+  this.passwordResetOTP = crypto.createHash('sha256').update(otp).digest('hex');
+  this.passwordResetOTPExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+  
+  return otp;
+};
+
+// ✅ Verify Password Reset OTP
+UserSchema.methods.verifyPasswordResetOTP = function(enteredOTP) {
+  if (!this.passwordResetOTP || !this.passwordResetOTPExpire) {
+    return { success: false, message: 'No reset OTP found.' };
+  }
+
+  if (Date.now() > this.passwordResetOTPExpire) {
+    return { success: false, message: 'OTP has expired.' };
+  }
+
+  const hashedOTP = crypto.createHash('sha256').update(enteredOTP).digest('hex');
+  
+  if (hashedOTP !== this.passwordResetOTP) {
+    return { success: false, message: 'Invalid OTP.' };
+  }
+
+  return { success: true };
+};
+
+// ✅ Clear OTP data
+UserSchema.methods.clearOTP = function() {
+  this.otp = undefined;
+  this.otpExpire = undefined;
+  this.otpAttempts = 0;
 };
 
 module.exports = mongoose.model('User', UserSchema);
