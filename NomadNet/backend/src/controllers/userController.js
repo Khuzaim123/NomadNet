@@ -7,7 +7,7 @@ const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require('.
 exports.getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
-      .select('-password -emailVerificationToken -passwordResetToken -reportedBy');
+      .select('-password -otp -otpExpire -passwordResetOTP -tempPassword -reportedBy');
 
     if (!user) {
       return res.status(404).json({
@@ -17,7 +17,7 @@ exports.getUserById = async (req, res) => {
     }
 
     // Check if user is blocked by the requester
-    if (req.user && user.blockedUsers.includes(req.user.id)) {
+    if (req.user && user.blockedUsers.includes(req.user._id)) {
       return res.status(403).json({
         status: 'error',
         message: 'You have been blocked by this user'
@@ -42,7 +42,7 @@ exports.getUserById = async (req, res) => {
 exports.getUserByUsername = async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username })
-      .select('-password -emailVerificationToken -passwordResetToken -reportedBy');
+      .select('-password -otp -otpExpire -passwordResetOTP -tempPassword -reportedBy');
 
     if (!user) {
       return res.status(404).json({
@@ -68,8 +68,8 @@ exports.getUserByUsername = async (req, res) => {
 // @access  Private (own profile only)
 exports.updateProfile = async (req, res) => {
   try {
-    // Check if user is updating their own profile
-    if (req.params.id !== req.user.id) {
+    // ✅ FIX: Convert both to string for comparison
+    if (req.params.id !== req.user._id.toString()) {
       return res.status(403).json({
         status: 'error',
         message: 'You can only update your own profile'
@@ -102,7 +102,7 @@ exports.updateProfile = async (req, res) => {
       req.params.id,
       updates,
       { new: true, runValidators: true }
-    ).select('-password');
+    ).select('-password -otp -otpExpire -passwordResetOTP -tempPassword');
 
     res.json({
       status: 'success',
@@ -122,8 +122,8 @@ exports.updateProfile = async (req, res) => {
 // @access  Private
 exports.uploadAvatar = async (req, res) => {
   try {
-    // Check if user is updating their own profile
-    if (req.params.id !== req.user.id) {
+    // ✅ FIX: Convert to string
+    if (req.params.id !== req.user._id.toString()) {
       return res.status(403).json({
         status: 'error',
         message: 'You can only update your own avatar'
@@ -182,7 +182,12 @@ exports.uploadAvatar = async (req, res) => {
 // @access  Private
 exports.updateLocation = async (req, res) => {
   try {
-    if (req.params.id !== req.user.id) {
+    // ✅ FIX: Convert to string for proper comparison
+    if (req.params.id !== req.user._id.toString()) {
+      console.log('ID Mismatch:');
+      console.log('req.params.id:', req.params.id, typeof req.params.id);
+      console.log('req.user._id:', req.user._id.toString(), typeof req.user._id.toString());
+      
       return res.status(403).json({
         status: 'error',
         message: 'You can only update your own location'
@@ -199,26 +204,40 @@ exports.updateLocation = async (req, res) => {
     }
 
     // Validate coordinates
-    if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
+    const lng = parseFloat(longitude);
+    const lat = parseFloat(latitude);
+
+    if (isNaN(lng) || isNaN(lat)) {
       return res.status(400).json({
         status: 'error',
-        message: 'Invalid coordinates'
+        message: 'Longitude and latitude must be valid numbers'
       });
     }
 
+    if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid coordinates. Longitude must be between -180 and 180, latitude between -90 and 90'
+      });
+    }
+
+    const updateData = {
+      currentLocation: {
+        type: 'Point',
+        coordinates: [lng, lat]
+      },
+      lastActive: Date.now()
+    };
+
+    // Only update city/country if provided
+    if (city) updateData.currentCity = city;
+    if (country) updateData.currentCountry = country;
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      {
-        currentLocation: {
-          type: 'Point',
-          coordinates: [longitude, latitude]
-        },
-        ...(city && { currentCity: city }),
-        ...(country && { currentCountry: country }),
-        lastActive: Date.now()
-      },
-      { new: true }
-    ).select('-password');
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password -otp -otpExpire -passwordResetOTP -tempPassword');
 
     res.json({
       status: 'success',
@@ -230,6 +249,7 @@ exports.updateLocation = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Update location error:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -242,7 +262,8 @@ exports.updateLocation = async (req, res) => {
 // @access  Private
 exports.updatePrivacySettings = async (req, res) => {
   try {
-    if (req.params.id !== req.user.id) {
+    // ✅ FIX: Convert to string
+    if (req.params.id !== req.user._id.toString()) {
       return res.status(403).json({
         status: 'error',
         message: 'You can only update your own privacy settings'
@@ -257,6 +278,13 @@ exports.updatePrivacySettings = async (req, res) => {
         updates[key] = req.body[key];
       }
     });
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No valid privacy settings provided'
+      });
+    }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
@@ -278,7 +306,7 @@ exports.updatePrivacySettings = async (req, res) => {
 };
 
 // @desc    Get nearby users
-// @route   GET /api/users/nearby
+// @route   GET /api/users/nearby/search
 // @access  Private
 exports.getNearbyUsers = async (req, res) => {
   try {
@@ -296,9 +324,16 @@ exports.getNearbyUsers = async (req, res) => {
     const lat = parseFloat(latitude);
     const maxDistance = parseInt(radius);
 
+    if (isNaN(lng) || isNaN(lat) || isNaN(maxDistance)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid coordinates or radius'
+      });
+    }
+
     // Find nearby users using geospatial query
     const users = await User.find({
-      _id: { $ne: req.user.id }, // Exclude current user
+      _id: { $ne: req.user._id }, // Exclude current user
       currentLocation: {
         $near: {
           $geometry: {
@@ -310,9 +345,9 @@ exports.getNearbyUsers = async (req, res) => {
       },
       shareLocation: true,
       visibility: { $in: ['public', 'connections'] },
-      isOnline: true
+      emailVerified: true
     })
-    .select('username displayName avatar profession skills currentCity currentLocation lastActive')
+    .select('username displayName avatar profession skills currentCity currentLocation lastActive isOnline')
     .limit(50);
 
     // Calculate distance for each user
@@ -334,6 +369,7 @@ exports.getNearbyUsers = async (req, res) => {
       data: { users: usersWithDistance }
     });
   } catch (error) {
+    console.error('Get nearby users error:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -348,7 +384,8 @@ exports.blockUser = async (req, res) => {
   try {
     const userToBlock = req.params.id;
 
-    if (userToBlock === req.user.id) {
+    // ✅ FIX: Convert to string
+    if (userToBlock === req.user._id.toString()) {
       return res.status(400).json({
         status: 'error',
         message: 'You cannot block yourself'
@@ -364,7 +401,7 @@ exports.blockUser = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user._id);
 
     // Check if already blocked
     if (user.blockedUsers.includes(userToBlock)) {
@@ -397,7 +434,7 @@ exports.unblockUser = async (req, res) => {
   try {
     const userToUnblock = req.params.id;
 
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user._id);
 
     // Check if user is blocked
     if (!user.blockedUsers.includes(userToUnblock)) {
@@ -426,11 +463,11 @@ exports.unblockUser = async (req, res) => {
 };
 
 // @desc    Get blocked users list
-// @route   GET /api/users/blocked
+// @route   GET /api/users/blocked/list
 // @access  Private
 exports.getBlockedUsers = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
+    const user = await User.findById(req.user._id)
       .populate('blockedUsers', 'username displayName avatar');
 
     res.json({
@@ -461,7 +498,8 @@ exports.reportUser = async (req, res) => {
       });
     }
 
-    if (userToReport === req.user.id) {
+    // ✅ FIX: Convert to string
+    if (userToReport === req.user._id.toString()) {
       return res.status(400).json({
         status: 'error',
         message: 'You cannot report yourself'
@@ -479,7 +517,7 @@ exports.reportUser = async (req, res) => {
 
     // Check if already reported by this user
     const alreadyReported = targetUser.reportedBy.some(
-      report => report.user.toString() === req.user.id
+      report => report.user.toString() === req.user._id.toString()
     );
 
     if (alreadyReported) {
@@ -491,7 +529,7 @@ exports.reportUser = async (req, res) => {
 
     // Add report
     targetUser.reportedBy.push({
-      user: req.user.id,
+      user: req.user._id,
       reason: reason,
       date: Date.now()
     });
@@ -515,7 +553,8 @@ exports.reportUser = async (req, res) => {
 // @access  Private
 exports.deleteAccount = async (req, res) => {
   try {
-    if (req.params.id !== req.user.id) {
+    // ✅ FIX: Convert to string
+    if (req.params.id !== req.user._id.toString()) {
       return res.status(403).json({
         status: 'error',
         message: 'You can only delete your own account'
@@ -523,6 +562,13 @@ exports.deleteAccount = async (req, res) => {
     }
 
     const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
 
     // Delete avatar from Cloudinary
     if (user.avatar && !user.avatar.includes('ui-avatars.com')) {
@@ -538,8 +584,6 @@ exports.deleteAccount = async (req, res) => {
 
     // Delete user
     await User.findByIdAndDelete(req.params.id);
-
-    // TODO: Also delete related data (messages, check-ins, marketplace items, etc.)
 
     res.json({
       status: 'success',

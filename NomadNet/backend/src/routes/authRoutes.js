@@ -1,37 +1,46 @@
 const express = require('express');
 const router = express.Router();
 const { 
-  register, 
+  register,
+  verifyOTP,
+  resendOTP,
   login, 
   getMe, 
   logout,
-  verifyEmail,
-  resendVerificationEmail,
   forgotPassword,
   resetPassword,
-  changePassword
+  requestPasswordChangeOTP,
+  verifyPasswordChangeOTP
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const {
   registerValidation,
   loginValidation,
-  emailValidation,
-  passwordValidation,
-  changePasswordValidation,
+  otpVerificationValidation,
+  resendOTPValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
+  requestPasswordChangeValidation,
+  verifyPasswordChangeValidation,
   validate
 } = require('../middleware/validator');
 
-// Public routes
+// ======================
+// 🌐 Public Routes
+// ======================
 router.post('/register', registerValidation, validate, register);
+router.post('/verify-otp', otpVerificationValidation, validate, verifyOTP);
+router.post('/resend-otp', resendOTPValidation, validate, resendOTP);
 router.post('/login', loginValidation, validate, login);
-router.get('/verify-email/:token', verifyEmail);
-router.post('/forgot-password', emailValidation, validate, forgotPassword);
-router.put('/reset-password/:token', passwordValidation, validate, resetPassword);
+router.post('/forgot-password', forgotPasswordValidation, validate, forgotPassword);
+router.post('/reset-password', resetPasswordValidation, validate, resetPassword);
 
-// Protected routes
+// ======================
+// 🔒 Protected Routes
+// ======================
 router.get('/me', protect, getMe);
 router.post('/logout', protect, logout);
-router.post('/resend-verification', protect, resendVerificationEmail);
-router.put('/change-password', protect, changePasswordValidation, validate, changePassword);
+router.post('/change-password/request', protect, requestPasswordChangeValidation, validate, requestPasswordChangeOTP);
+router.post('/change-password/verify', protect, verifyPasswordChangeValidation, validate, verifyPasswordChangeOTP);
 
 module.exports = router;
