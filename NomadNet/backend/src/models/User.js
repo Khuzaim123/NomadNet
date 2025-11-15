@@ -1,8 +1,11 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const UserSchema = new mongoose.Schema({
-  // Authentication
+  // ======================
+  // 🔐 Authentication
+  // ======================
   email: {
     type: String,
     required: [true, 'Please add an email'],
@@ -17,10 +20,12 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a password'],
     minlength: 6,
-    select: false // Don't return password by default
+    select: false
   },
-  
-  // Profile
+
+  // ======================
+  // 👤 Profile Info
+  // ======================
   username: {
     type: String,
     required: [true, 'Please add a username'],
@@ -42,8 +47,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     maxlength: 500
   },
-  
-  // Professional Info
+
+  // ======================
+  // 💼 Professional Info
+  // ======================
   profession: {
     type: String,
     trim: true
@@ -56,16 +63,20 @@ const UserSchema = new mongoose.Schema({
     type: String,
     trim: true
   }],
-  
-  // Links
+
+  // ======================
+  // 🔗 Links
+  // ======================
   links: {
     linkedin: { type: String },
     github: { type: String },
     portfolio: { type: String },
     twitter: { type: String }
   },
-  
-  // Location
+
+  // ======================
+  // 📍 Location Info
+  // ======================
   currentCity: {
     type: String,
     required: [true, 'Please add your current city']
@@ -87,13 +98,17 @@ const UserSchema = new mongoose.Schema({
   homeCountry: {
     type: String
   },
-  
-  // Languages
+
+  // ======================
+  // 🗣️ Languages
+  // ======================
   languages: [{
     type: String
   }],
-  
-  // Status & Activity
+
+  // ======================
+  // 💬 Activity & Status
+  // ======================
   isOnline: {
     type: Boolean,
     default: false
@@ -102,8 +117,10 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  
-  // Privacy Settings
+
+  // ======================
+  // ⚙️ Privacy Settings
+  // ======================
   shareLocation: {
     type: Boolean,
     default: true
@@ -118,8 +135,10 @@ const UserSchema = new mongoose.Schema({
     enum: ['everyone', 'nearby', 'connections'],
     default: 'everyone'
   },
-  
-  // Verification
+
+  // ======================
+  // ✅ Verification
+  // ======================
   isVerified: {
     type: Boolean,
     default: false
@@ -129,8 +148,22 @@ const UserSchema = new mongoose.Schema({
     enum: ['none', 'email', 'phone', 'id'],
     default: 'none'
   },
-  
-  // Safety
+  emailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: String,
+  emailVerificationExpire: Date,
+
+  // ======================
+  // 🔁 Password Reset
+  // ======================
+  passwordResetToken: String,
+  passwordResetExpire: Date,
+
+  // ======================
+  // 🚫 Safety
+  // ======================
   blockedUsers: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -139,49 +172,68 @@ const UserSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     reason: String,
     date: { type: Date, default: Date.now }
-  }],
-  
-  // Metadata
-  passwordResetToken: String,
-  passwordResetExpire: Date,
-  emailVerificationToken: String,
-  emailVerified: {
-    type: Boolean,
-    default: false
-  }
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// Indexes for performance
+// ======================
+// ⚡ Indexes
+// ======================
 UserSchema.index({ currentLocation: '2dsphere' });
 UserSchema.index({ username: 1, email: 1 });
 UserSchema.index({ currentCity: 1, isOnline: 1 });
 UserSchema.index({ skills: 1, interests: 1 });
 
-// Encrypt password before saving
+// ======================
+// 🔑 Password Hashing
+// ======================
 UserSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    return next();
-  }
-  
+  if (!this.isModified('password')) return next();
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
-// Match password method
+// ======================
+// 🔍 Methods
+// ======================
+
+// Compare entered password with stored hash
 UserSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Update lastActive on any action
+// Update last activity time
 UserSchema.methods.updateActivity = function() {
   this.lastActive = Date.now();
   this.isOnline = true;
   return this.save();
+};
+
+// Generate email verification token (valid for 24h)
+UserSchema.methods.generateEmailVerificationToken = function() {
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  this.emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(verificationToken)
+    .digest('hex');
+  this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  return verificationToken;
+};
+
+// Generate password reset token (valid for 1h)
+UserSchema.methods.generatePasswordResetToken = function() {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+  this.passwordResetExpire = Date.now() + 60 * 60 * 1000; // 1 hour
+  return resetToken;
 };
 
 module.exports = mongoose.model('User', UserSchema);
