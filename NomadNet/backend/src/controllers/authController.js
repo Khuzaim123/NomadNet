@@ -2,8 +2,9 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 const {
-  sendVerificationEmail,
-  sendPasswordResetEmail,
+  sendRegistrationOTP,
+  sendPasswordResetOTP,
+  sendPasswordChangeOTP,
   sendWelcomeEmail
 } = require('../utils/emailService');
 
@@ -22,126 +23,117 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Check if user exists
-    const userExists = await User.findOne({ 
-      $or: [{ email }, { username }] 
+    // Check if user already exists
+    const userExists = await User.findOne({
+      $or: [{ email }, { username }]
     });
 
     if (userExists) {
       return res.status(400).json({
         status: 'error',
-        message: userExists.email === email 
-          ? 'Email already registered' 
+        message: userExists.email === email
+          ? 'Email already registered'
           : 'Username already taken'
       });
     }
 
-    // Create user
+    // Create new user (unverified)
     const user = await User.create({
       email,
       password,
       username,
       displayName,
-      currentCity
+      currentCity,
+      emailVerified: false
     });
 
-    // Generate email verification token
-    const verificationToken = user.generateEmailVerificationToken();
+    // Generate OTP for email verification
+    const otp = user.generateOTP();
     await user.save({ validateBeforeSave: false });
 
-    // Send verification email
+    // Send OTP via email
     try {
-      await sendVerificationEmail(email, username, verificationToken);
-      console.log('✅ Verification email sent to:', email);
+      await sendRegistrationOTP(email, username, otp);
+      console.log(`✅ OTP sent successfully to: ${email}`);
     } catch (emailError) {
-      console.error('❌ Failed to send verification email:', emailError);
-      // Don't fail registration if email fails
-    }
-
-    // Generate JWT token
-    const token = generateToken(user._id);
-
-    res.status(201).json({
-      status: 'success',
-      message: 'Registration successful! Please check your email to verify your account.',
-      data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          username: user.username,
-          displayName: user.displayName,
-          avatar: user.avatar,
-          emailVerified: user.emailVerified
-        },
-        token
-      }
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: error.message
-    });
-  }
-};
-
-// @desc    Verify email
-// @route   GET /api/auth/verify-email/:token
-// @access  Public
-exports.verifyEmail = async (req, res) => {
-  try {
-    // Get hashed token
-    const emailVerificationToken = crypto
-      .createHash('sha256')
-      .update(req.params.token)
-      .digest('hex');
-
-    const user = await User.findOne({
-      emailVerificationToken,
-      emailVerificationExpire: { $gt: Date.now() }
-    });
-
-    if (!user) {
-      return res.status(400).json({
+      console.error('❌ Email sending failed:', emailError.message);
+      
+      // Rollback: Delete user if email fails
+      await User.findByIdAndDelete(user._id);
+      
+      return res.status(500).json({
         status: 'error',
-        message: 'Invalid or expired verification token'
+        message: 'Failed to send verification email. Please try again later.',
+        error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
       });
     }
 
-    // Set email as verified
-    user.emailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpire = undefined;
-    await user.save();
-
-    // Send welcome email
-    try {
-      await sendWelcomeEmail(user.email, user.username);
-    } catch (emailError) {
-      console.error('Failed to send welcome email:', emailError);
-    }
-
-    res.json({
+    // Success response
+    res.status(201).json({
       status: 'success',
-      message: 'Email verified successfully! You can now use all features.',
+      message: `Registration successful! We've sent a 6-digit OTP to ${email}. Please check your inbox and verify to continue.`,
       data: {
-        emailVerified: true
+        userId: user._id,
+        email: user.email,
+        username: user.username,
+        requiresOTP: true,
+        otpExpiresIn: '10 minutes'
       }
     });
+
   } catch (error) {
+    console.error('Registration error:', error);
+    
+    // Handle mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation error',
+        errors: messages
+      });
+    }
+
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({
+        status: 'error',
+        message: `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`
+      });
+    }
+
+    // Generic error
     res.status(500).json({
       status: 'error',
-      message: error.message
+      message: 'Server error. Please try again later.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
-// @desc    Resend verification email
-// @route   POST /api/auth/resend-verification
-// @access  Private
-exports.resendVerificationEmail = async (req, res) => {
+// @desc    Verify OTP after registration
+// @route   POST /api/auth/verify-otp
+// @access  Public
+exports.verifyOTP = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide email and OTP'
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
 
     if (user.emailVerified) {
       return res.status(400).json({
@@ -150,18 +142,124 @@ exports.resendVerificationEmail = async (req, res) => {
       });
     }
 
-    // Generate new verification token
-    const verificationToken = user.generateEmailVerificationToken();
-    await user.save({ validateBeforeSave: false });
+    // Verify OTP
+    const verification = user.verifyOTP(otp);
 
-    // Send verification email
-    await sendVerificationEmail(user.email, user.username, verificationToken);
+    if (!verification.success) {
+      await user.save();
+      return res.status(400).json({
+        status: 'error',
+        message: verification.message
+      });
+    }
+
+    // Mark as verified
+    user.emailVerified = true;
+    user.isVerified = true;
+    user.verificationBadge = 'email';
+    user.clearOTP();
+    await user.save();
+
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(user.email, user.username);
+      console.log(`✅ Welcome email sent to: ${user.email}`);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+    }
+
+    // Generate token
+    const token = generateToken(user._id);
 
     res.json({
       status: 'success',
-      message: 'Verification email sent! Please check your inbox.'
+      message: 'Email verified successfully! You can now login.',
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          username: user.username,
+          displayName: user.displayName,
+          emailVerified: user.emailVerified
+        },
+        token
+      }
     });
   } catch (error) {
+    console.error('OTP verification error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// @desc    Resend OTP
+// @route   POST /api/auth/resend-otp
+// @access  Public
+exports.resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide an email address'
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'No account found with this email'
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email is already verified'
+      });
+    }
+
+    // Check rate limiting (1 minute cooldown)
+    if (user.otpLastSent) {
+      const timeSinceLastOTP = Date.now() - user.otpLastSent;
+      const cooldownMs = 60 * 1000; // 1 minute
+
+      if (timeSinceLastOTP < cooldownMs) {
+        const waitTime = Math.ceil((cooldownMs - timeSinceLastOTP) / 1000);
+        return res.status(429).json({
+          status: 'error',
+          message: `Please wait ${waitTime} seconds before requesting a new OTP`
+        });
+      }
+    }
+
+    // Generate new OTP
+    const otp = user.generateOTP();
+    await user.save({ validateBeforeSave: false });
+
+    // Send OTP
+    try {
+      await sendRegistrationOTP(user.email, user.username, otp);
+      console.log(`✅ OTP resent to: ${user.email}`);
+    } catch (emailError) {
+      console.error('Failed to resend OTP:', emailError);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Failed to send email. Please try again.'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      message: 'New OTP sent! Please check your email.'
+    });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -176,7 +274,6 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate email & password
     if (!email || !password) {
       return res.status(400).json({
         status: 'error',
@@ -184,7 +281,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Check for user
     const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
@@ -194,7 +290,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Check if password matches
     const isMatch = await user.matchPassword(password);
 
     if (!isMatch) {
@@ -204,12 +299,21 @@ exports.login = async (req, res) => {
       });
     }
 
+    // Check email verification
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Please verify your email before logging in. Check your inbox for the OTP.',
+        emailVerified: false,
+        requiresOTP: true
+      });
+    }
+
     // Update online status
     user.isOnline = true;
     user.lastActive = Date.now();
     await user.save();
 
-    // Generate token
     const token = generateToken(user._id);
 
     res.json({
@@ -223,7 +327,6 @@ exports.login = async (req, res) => {
           displayName: user.displayName,
           avatar: user.avatar,
           currentCity: user.currentCity,
-          currentLocation: user.currentLocation,
           emailVerified: user.emailVerified,
           isOnline: user.isOnline
         },
@@ -231,6 +334,7 @@ exports.login = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -238,7 +342,7 @@ exports.login = async (req, res) => {
   }
 };
 
-// @desc    Forgot password
+// @desc    Request password reset OTP
 // @route   POST /api/auth/forgot-password
 // @access  Public
 exports.forgotPassword = async (req, res) => {
@@ -255,39 +359,37 @@ exports.forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      // Don't reveal that user doesn't exist (security best practice)
       return res.json({
         status: 'success',
-        message: 'If an account exists with this email, a password reset link has been sent.'
+        message: 'If an account exists, an OTP has been sent to your email.'
       });
     }
 
-    // Generate reset token
-    const resetToken = user.generatePasswordResetToken();
+    // Generate reset OTP
+    const otp = user.generatePasswordResetOTP();
     await user.save({ validateBeforeSave: false });
 
-    // Send password reset email
     try {
-      await sendPasswordResetEmail(user.email, user.username, resetToken);
+      await sendPasswordResetOTP(user.email, user.username, otp);
+      console.log(`✅ Password reset OTP sent to: ${user.email}`);
 
       res.json({
         status: 'success',
-        message: 'Password reset email sent! Please check your inbox.',
-        // For development/testing only - remove in production
-        resetToken: resetToken
+        message: 'Password reset OTP sent! Check your email.'
       });
     } catch (emailError) {
-      // If email fails, clear the token
-      user.passwordResetToken = undefined;
-      user.passwordResetExpire = undefined;
+      user.passwordResetOTP = undefined;
+      user.passwordResetOTPExpire = undefined;
       await user.save({ validateBeforeSave: false });
 
+      console.error('Failed to send password reset email:', emailError);
       return res.status(500).json({
         status: 'error',
-        message: 'Email could not be sent. Please try again later.'
+        message: 'Failed to send email. Please try again.'
       });
     }
   } catch (error) {
+    console.error('Forgot password error:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -295,62 +397,61 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-// @desc    Reset password
-// @route   PUT /api/auth/reset-password/:token
+// @desc    Verify reset OTP & set new password
+// @route   POST /api/auth/reset-password
 // @access  Public
 exports.resetPassword = async (req, res) => {
   try {
-    const { password } = req.body;
+    const { email, otp, newPassword } = req.body;
 
-    if (!password) {
+    if (!email || !otp || !newPassword) {
       return res.status(400).json({
         status: 'error',
-        message: 'Please provide a new password'
+        message: 'Please provide email, OTP, and new password'
       });
     }
 
-    if (password.length < 6) {
+    if (newPassword.length < 8) {
       return res.status(400).json({
         status: 'error',
-        message: 'Password must be at least 6 characters'
+        message: 'Password must be at least 8 characters'
       });
     }
 
-    // Get hashed token
-    const passwordResetToken = crypto
-      .createHash('sha256')
-      .update(req.params.token)
-      .digest('hex');
-
-    const user = await User.findOne({
-      passwordResetToken,
-      passwordResetExpire: { $gt: Date.now() }
-    });
+    const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Verify OTP
+    const verification = user.verifyPasswordResetOTP(otp);
+
+    if (!verification.success) {
       return res.status(400).json({
         status: 'error',
-        message: 'Invalid or expired reset token'
+        message: verification.message
       });
     }
 
     // Set new password
-    user.password = password;
-    user.passwordResetToken = undefined;
-    user.passwordResetExpire = undefined;
+    user.password = newPassword;
+    user.passwordResetOTP = undefined;
+    user.passwordResetOTPExpire = undefined;
     await user.save();
 
-    // Generate new JWT token
     const token = generateToken(user._id);
 
     res.json({
       status: 'success',
-      message: 'Password reset successful! You can now login with your new password.',
-      data: {
-        token
-      }
+      message: 'Password reset successful! You can now login.',
+      data: { token }
     });
   } catch (error) {
+    console.error('Reset password error:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -358,10 +459,10 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-// @desc    Change password (when logged in)
-// @route   PUT /api/auth/change-password
+// @desc    Request OTP for password change
+// @route   POST /api/auth/change-password/request
 // @access  Private
-exports.changePassword = async (req, res) => {
+exports.requestPasswordChangeOTP = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -372,17 +473,16 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       return res.status(400).json({
         status: 'error',
-        message: 'New password must be at least 6 characters'
+        message: 'New password must be at least 8 characters'
       });
     }
 
-    // Get user with password
     const user = await User.findById(req.user.id).select('+password');
 
-    // Check current password
+    // Verify current password
     const isMatch = await user.matchPassword(currentPassword);
 
     if (!isMatch) {
@@ -392,11 +492,80 @@ exports.changePassword = async (req, res) => {
       });
     }
 
+    // Store temp password
+    const bcrypt = require('bcryptjs');
+    const salt = await bcrypt.genSalt(10);
+    user.tempPassword = await bcrypt.hash(newPassword, salt);
+
+    // Generate OTP
+    const otp = user.generateOTP();
+    await user.save({ validateBeforeSave: false });
+
+    // Send OTP
+    try {
+      await sendPasswordChangeOTP(user.email, user.username, otp);
+      console.log(`✅ Password change OTP sent to: ${user.email}`);
+
+      res.json({
+        status: 'success',
+        message: 'OTP sent to your email. Please verify to complete password change.'
+      });
+    } catch (emailError) {
+      console.error('Failed to send password change email:', emailError);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Failed to send email. Please try again.'
+      });
+    }
+  } catch (error) {
+    console.error('Request password change error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// @desc    Verify OTP and change password
+// @route   POST /api/auth/change-password/verify
+// @access  Private
+exports.verifyPasswordChangeOTP = async (req, res) => {
+  try {
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide OTP'
+      });
+    }
+
+    const user = await User.findById(req.user.id).select('+password +tempPassword');
+
+    if (!user.tempPassword) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No password change request found'
+      });
+    }
+
+    // Verify OTP
+    const verification = user.verifyOTP(otp);
+
+    if (!verification.success) {
+      await user.save();
+      return res.status(400).json({
+        status: 'error',
+        message: verification.message
+      });
+    }
+
     // Update password
-    user.password = newPassword;
+    user.password = user.tempPassword;
+    user.tempPassword = undefined;
+    user.clearOTP();
     await user.save();
 
-    // Generate new token
     const token = generateToken(user._id);
 
     res.json({
@@ -405,6 +574,7 @@ exports.changePassword = async (req, res) => {
       data: { token }
     });
   } catch (error) {
+    console.error('Verify password change error:', error);
     res.status(500).json({
       status: 'error',
       message: error.message
@@ -412,7 +582,7 @@ exports.changePassword = async (req, res) => {
   }
 };
 
-// @desc    Get current logged in user
+// @desc    Get current user
 // @route   GET /api/auth/me
 // @access  Private
 exports.getMe = async (req, res) => {
@@ -436,7 +606,6 @@ exports.getMe = async (req, res) => {
 // @access  Private
 exports.logout = async (req, res) => {
   try {
-    // Update user status
     await User.findByIdAndUpdate(req.user.id, {
       isOnline: false,
       lastActive: Date.now()
