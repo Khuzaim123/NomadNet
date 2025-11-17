@@ -1,11 +1,26 @@
+// App.jsx
 import React from 'react';
-import AuthPage from './components/auth/authPage';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import AuthPage from './pages/authPage';
+import ProfilePage from './pages/profilePage';
+import NotFoundPage from './pages/notFoundPage'; // 404 page
 import './App.css';
 
 function App() {
   return (
     <div className="App">
-      <AuthPage />
+      <Router>
+        <Routes>
+          {/* Login / Auth Page */}
+          <Route path="/" element={<AuthPage />} />
+
+          {/* Profile Page */}
+          <Route path="/profile/:username" element={<ProfilePage />} />
+
+          {/* 404 Page */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Router>
     </div>
   );
 }

@@ -1,0 +1,828 @@
+/* ===================================
+   🎨 VARIABLES & RESET
+   =================================== */
+:root {
+  --primary: #6366f1;
+  --primary-dark: #4f46e5;
+  --primary-light: #818cf8;
+  --success: #10b981;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --bg-dark: #0f172a;
+  --bg-card: rgba(30, 41, 59, 0.8);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --border: #334155;
+  --shadow: rgba(0, 0, 0, 0.5);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* ===================================
+   📦 CONTAINER & LAYOUT
+   =================================== */
+.container {
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* ===================================
+   🌀 BACKGROUND ANIMATION - FULL SCREEN
+   =================================== */
+.bg-animation {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.circle {
+  position: absolute;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(129, 140, 248, 0.2));
+  filter: blur(60px);
+  animation: float 20s infinite ease-in-out;
+}
+
+.circle-1 {
+  width: 500px;
+  height: 500px;
+  top: -150px;
+  left: -150px;
+  animation-delay: 0s;
+}
+
+.circle-2 {
+  width: 600px;
+  height: 600px;
+  bottom: -200px;
+  right: -200px;
+  animation-delay: 5s;
+}
+
+.circle-3 {
+  width: 400px;
+  height: 400px;
+  top: 40%;
+  right: -100px;
+  animation-delay: 10s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(50px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-30px, 30px) scale(0.9);
+  }
+}
+
+/* ===================================
+   🎴 AUTH CARD - COMPACT
+   =================================== */
+.auth-card {
+  background: rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px var(--shadow);
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  padding: 32px;
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  animation: slideUp 0.5s ease-out;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+/* Custom scrollbar */
+.auth-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.auth-card::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 10px;
+}
+
+.auth-card::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 10px;
+}
+
+.auth-card::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-light);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===================================
+   🎯 BRANDING - COMPACT
+   =================================== */
+.brand {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.logo {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.logo img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(99, 102, 241, 0.4));
+}
+
+.brand h1 {
+  color: var(--text-primary);
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -0.5px;
+}
+
+.brand .tagline {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* ===================================
+   📝 FORM STYLES - COMPACT
+   =================================== */
+.auth-form {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.auth-form h2 {
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.auth-form .subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ===================================
+   🔤 INPUT GROUPS - COMPACT
+   =================================== */
+.input-group {
+  margin-bottom: 16px;
+}
+
+.input-group label {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.input-wrapper input {
+  width: 100%;
+  padding: 11px 14px 11px 44px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.input-wrapper input::placeholder {
+  color: var(--text-secondary);
+}
+
+.input-wrapper input:focus {
+  border-color: var(--primary);
+  background: rgba(15, 23, 42, 0.8);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.toggle-password {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.3s;
+  z-index: 2;
+}
+
+.toggle-password svg {
+  width: 18px;
+  height: 18px;
+}
+
+.toggle-password:hover {
+  color: var(--primary);
+}
+
+/* ===================================
+   💪 PASSWORD STRENGTH - COMPACT
+   =================================== */
+.password-strength {
+  margin-top: 6px;
+}
+
+.strength-bar {
+  height: 3px;
+  background: rgba(51, 65, 85, 0.5);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.strength-fill {
+  height: 100%;
+  transition: all 0.3s ease;
+  border-radius: 3px;
+}
+
+.strength-fill.weak {
+  width: 33%;
+  background: var(--error);
+}
+
+.strength-fill.medium {
+  width: 66%;
+  background: var(--warning);
+}
+
+.strength-fill.strong {
+  width: 100%;
+  background: var(--success);
+}
+
+.strength-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ===================================
+   ✅ CHECKBOXES & OPTIONS
+   =================================== */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.checkbox input {
+  margin-right: 8px;
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+}
+
+.link {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 0.3s;
+}
+
+.link:hover {
+  color: var(--primary-light);
+  text-decoration: underline;
+}
+
+/* ===================================
+   🔘 BUTTONS - COMPACT
+   =================================== */
+.btn {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  margin-bottom: 14px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-loader svg {
+  width: 22px;
+  height: 22px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===================================
+   🔗 SOCIAL BUTTONS - COMPACT
+   =================================== */
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 18px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border);
+}
+
+.divider span {
+  padding: 0 12px;
+}
+
+.social-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.btn-social {
+  padding: 10px 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1.5px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-social svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.btn-social:hover {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.1);
+  transform: translateY(-1px);
+}
+
+/* ===================================
+   🚨 ALERTS - COMPACT
+   =================================== */
+.alert {
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  animation: slideDown 0.3s ease-out;
+  white-space: pre-line;
+  line-height: 1.5;
+}
+
+.alert.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.alert.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.alert.info {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--primary-light);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===================================
+   🔄 SWITCH FORM
+   =================================== */
+.switch-form {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 18px;
+}
+
+.switch-form a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  margin-left: 4px;
+  transition: color 0.3s;
+}
+
+.switch-form a:hover {
+  color: var(--primary-light);
+  text-decoration: underline;
+}
+
+/* ===================================
+   📱 RESPONSIVE DESIGN
+   =================================== */
+
+/* Tablet */
+@media (max-width: 768px) {
+  .auth-card {
+    padding: 28px;
+    max-width: 400px;
+  }
+
+  .brand h1 {
+    font-size: 24px;
+  }
+
+  .auth-form h2 {
+    font-size: 20px;
+  }
+
+  .logo {
+    width: 52px;
+    height: 52px;
+  }
+
+  .logo img {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .container {
+    padding: 12px;
+  }
+
+  .auth-card {
+    padding: 24px 18px;
+    border-radius: 18px;
+    max-height: 92vh;
+  }
+
+  .brand {
+    margin-bottom: 20px;
+  }
+
+  .brand h1 {
+    font-size: 22px;
+  }
+
+  .brand .tagline {
+    font-size: 12px;
+  }
+
+  .logo {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 10px;
+  }
+
+  .logo img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .auth-form h2 {
+    font-size: 19px;
+  }
+
+  .auth-form .subtitle {
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+
+  .input-group {
+    margin-bottom: 14px;
+  }
+
+  .input-group label {
+    font-size: 12px;
+    margin-bottom: 5px;
+  }
+
+  .input-wrapper input {
+    padding: 10px 12px 10px 40px;
+    font-size: 13px;
+  }
+
+  .input-icon {
+    left: 12px;
+    width: 17px;
+    height: 17px;
+  }
+
+  .toggle-password {
+    right: 12px;
+  }
+
+  .toggle-password svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .btn {
+    padding: 11px 18px;
+    font-size: 13px;
+  }
+
+  .social-buttons {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .btn-social {
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+
+  .form-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .divider {
+    margin: 14px 0;
+    font-size: 11px;
+  }
+
+  .switch-form {
+    font-size: 12px;
+    margin-top: 16px;
+  }
+
+  /* OTP input on mobile */
+  #otp {
+    font-size: 20px !important;
+    letter-spacing: 6px !important;
+    padding: 12px !important;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 360px) {
+  .auth-card {
+    padding: 20px 16px;
+  }
+
+  .brand h1 {
+    font-size: 20px;
+  }
+
+  .auth-form h2 {
+    font-size: 18px;
+  }
+
+  .input-wrapper input {
+    padding: 9px 10px 9px 38px;
+  }
+}
+
+/* Desktop - Optimize for large screens */
+@media (min-width: 1024px) {
+  .container {
+    padding: 40px;
+  }
+
+  .auth-card {
+    max-width: 460px;
+    padding: 36px;
+  }
+
+  .auth-card:hover {
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+  }
+
+  .circle-1 {
+    width: 600px;
+    height: 600px;
+  }
+
+  .circle-2 {
+    width: 700px;
+    height: 700px;
+  }
+
+  .circle-3 {
+    width: 500px;
+    height: 500px;
+  }
+}
+
+/* Very large screens */
+@media (min-width: 1440px) {
+  .auth-card {
+    max-width: 480px;
+    padding: 40px;
+  }
+}
+
+/* Landscape mobile */
+@media (max-height: 600px) and (orientation: landscape) {
+  .container {
+    padding: 10px;
+    align-items: flex-start;
+  }
+
+  .auth-card {
+    margin: 15px auto;
+    max-height: none;
+    padding: 20px;
+  }
+
+  .brand {
+    margin-bottom: 12px;
+  }
+
+  .logo {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 6px;
+  }
+
+  .logo img {
+    width: 40px;
+    height: 40px;
+  }
+
+  .brand h1 {
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  .brand .tagline {
+    font-size: 11px;
+  }
+
+  .auth-form h2 {
+    font-size: 17px;
+  }
+
+  .auth-form .subtitle {
+    margin-bottom: 12px;
+  }
+
+  .input-group {
+    margin-bottom: 10px;
+  }
+
+  .btn {
+    padding: 10px 16px;
+  }
+}
+
+/* Password requirements compact style */
+.input-group div[style*="fontSize: '12px'"] {
+  font-size: 11px !important;
+  margin-top: 6px;
+}
+
+.input-group div[style*="fontSize: '12px'"] > div:first-child {
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.input-group div[style*="display: flex"] span {
+  font-size: 10px !important;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.5);
+}

@@ -122,8 +122,23 @@ exports.updateProfile = async (req, res) => {
 // @access  Private
 exports.uploadAvatar = async (req, res) => {
   try {
+    console.log('\n📸 ============ UPLOAD AVATAR CONTROLLER ============');
+    console.log('Params ID:', req.params.id);
+    console.log('User ID:', req.user._id.toString());
+    console.log('File present:', !!req.file);
+    
+    if (req.file) {
+      console.log('File details:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        buffer: req.file.buffer ? `${req.file.buffer.length} bytes` : 'No buffer'
+      });
+    }
+
     // ✅ FIX: Convert to string
     if (req.params.id !== req.user._id.toString()) {
+      console.log('❌ Authorization failed - ID mismatch');
       return res.status(403).json({
         status: 'error',
         message: 'You can only update your own avatar'
@@ -131,52 +146,102 @@ exports.uploadAvatar = async (req, res) => {
     }
 
     if (!req.file) {
+      console.log('❌ No file in request');
       return res.status(400).json({
         status: 'error',
         message: 'Please upload an image file'
       });
     }
 
+    console.log('🔍 Finding user...');
     const user = await User.findById(req.params.id);
+
+    if (!user) {
+      console.log('❌ User not found');
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    console.log('✅ User found:', user.username);
+    console.log('Current avatar:', user.avatar);
 
     // Delete old avatar from Cloudinary (if exists and not default)
     if (user.avatar && !user.avatar.includes('ui-avatars.com')) {
       const oldPublicId = extractPublicId(user.avatar);
+      console.log('🗑️  Old avatar public ID:', oldPublicId);
+      
       if (oldPublicId) {
         try {
+          console.log('Deleting old avatar from Cloudinary...');
           await deleteFromCloudinary(oldPublicId);
+          console.log('✅ Old avatar deleted');
         } catch (err) {
-          console.error('Error deleting old avatar:', err);
+          console.error('⚠️  Error deleting old avatar:', err.message);
         }
       }
     }
 
     // Upload new avatar to Cloudinary
+    const publicId = `user_${user._id}_${Date.now()}`;
+    console.log('☁️  Uploading to Cloudinary...');
+    console.log('   Folder: nomadnet/avatars');
+    console.log('   Public ID:', publicId);
+    console.log('   Buffer size:', req.file.buffer.length, 'bytes');
+
     const result = await uploadToCloudinary(
       req.file.buffer,
       'nomadnet/avatars',
-      `user_${user._id}_${Date.now()}`
+      publicId
     );
+
+    console.log('✅ Cloudinary upload successful!');
+    console.log('   URL:', result.secure_url);
+    console.log('   Public ID:', result.public_id);
 
     // Update user avatar
     user.avatar = result.secure_url;
     await user.save();
 
+    console.log('✅ User avatar updated in database');
+    console.log('==================================================\n');
+
     res.json({
       status: 'success',
       message: 'Avatar uploaded successfully',
       data: {
-        avatar: user.avatar
+        user: {
+          _id: user._id,
+          username: user.username,
+          displayName: user.displayName,
+          avatar: user.avatar,
+          email: user.email,
+          bio: user.bio,
+          profession: user.profession,
+          skills: user.skills,
+          interests: user.interests,
+          location: {
+            currentCity: user.currentCity,
+            currentCountry: user.currentCountry,
+            homeCountry: user.homeCountry
+          },
+          socialLinks: user.socialLinks
+        }
       }
     });
   } catch (error) {
+    console.error('\n❌ ============ AVATAR UPLOAD FAILED ============');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('===============================================\n');
+    
     res.status(500).json({
       status: 'error',
       message: error.message
     });
   }
 };
-
 // @desc    Update user location
 // @route   PATCH /api/users/:id/location
 // @access  Private

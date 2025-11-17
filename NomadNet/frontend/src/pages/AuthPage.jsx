@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import './auth.css';
+import logo from '../assets/nomadnet_logo.svg';
+import '../styles/auth.css';
 import {
   login,
   register,
@@ -9,9 +10,12 @@ import {
   storeAuth,
   getToken,
   clearAuth
-} from '../../services/authService';
+} from '../services/authService';
+import { useNavigate } from 'react-router-dom';
 
 const AuthPage = () => {
+  const navigate = useNavigate();
+
   // State management
   const [isLogin, setIsLogin] = useState(true);
   const [showOTPVerification, setShowOTPVerification] = useState(false);
@@ -101,14 +105,15 @@ const AuthPage = () => {
     try {
       const data = await getCurrentUser(token);
       console.log('User already logged in:', data);
-      window.location.href = '/dashboard';
+      if (data.username) {
+        navigate(`/profile/${data.username}`);
+      }
     } catch (error) {
       console.error('Token verification error:', error);
       clearAuth();
     }
   };
 
-  // Handle login
   const handleLogin = async (e) => {
     e.preventDefault();
 
@@ -117,7 +122,6 @@ const AuthPage = () => {
       return;
     }
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(loginData.email)) {
       showAlert('Please enter a valid email address', 'error');
@@ -129,83 +133,75 @@ const AuthPage = () => {
     try {
       const response = await login(loginData.email, loginData.password);
 
-      // Check if email verification is required
       if (response.status === 'error' && response.requiresOTP) {
-        setOtpData({ ...otpData, email: loginData.email });
+        setOtpData({ email: loginData.email, otp: '', resendCooldown: 60 });
         setShowOTPVerification(true);
         showAlert('Please verify your email first', 'error');
-        setLoading(false);
         return;
       }
 
-      // Store token and user data
-      storeAuth(response.data.token, response.data.user, loginData.rememberMe);
+      const loggedInUser = response?.data?.user;
+      if (!loggedInUser || !loggedInUser.username) {
+        throw new Error('Invalid login response from server.');
+      }
 
+      storeAuth(response.data.token, loggedInUser, loginData.rememberMe);
       showAlert('Login successful! Redirecting...', 'success');
 
-      // Redirect to dashboard
       setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 1500);
+        navigate(`/profile/${loggedInUser.username}`);
+      }, 1000);
+
     } catch (error) {
       console.error('Login error:', error);
-      showAlert(error.message || 'Login failed. Please check your credentials.', 'error');
+      showAlert(error?.response?.data?.message || error.message || 'Login failed. Please check your credentials.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle signup
   const handleSignup = async (e) => {
     e.preventDefault();
 
     const { username, displayName, email, currentCity, password, confirmPassword, agreeTerms } = signupData;
 
-    // Check all fields
     if (!username || !displayName || !email || !currentCity || !password || !confirmPassword) {
       showAlert('Please fill in all fields', 'error');
       return;
     }
 
-    // Username validation
     if (username.length < 3 || username.length > 30) {
       showAlert('Username must be between 3 and 30 characters', 'error');
       return;
     }
 
-    // Username format validation (alphanumeric and underscores only)
     const usernameRegex = /^[a-zA-Z0-9_]+$/;
     if (!usernameRegex.test(username)) {
       showAlert('Username can only contain letters, numbers, and underscores', 'error');
       return;
     }
 
-    // Display name validation
     if (displayName.length < 2) {
       showAlert('Display name must be at least 2 characters', 'error');
       return;
     }
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       showAlert('Please enter a valid email address', 'error');
       return;
     }
 
-    // City validation
     if (currentCity.length < 2) {
       showAlert('Please enter a valid city name', 'error');
       return;
     }
 
-    // ✅ UPDATED: Password validation (8+ chars with complexity)
     if (password.length < 8) {
       showAlert('Password must be at least 8 characters', 'error');
       return;
     }
 
-    // Check password complexity
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
     if (!passwordRegex.test(password)) {
       showAlert(
@@ -219,13 +215,11 @@ const AuthPage = () => {
       return;
     }
 
-    // Confirm password match
     if (password !== confirmPassword) {
       showAlert('Passwords do not match', 'error');
       return;
     }
 
-    // Terms agreement
     if (!agreeTerms) {
       showAlert('Please agree to the Terms of Service', 'error');
       return;
@@ -246,11 +240,9 @@ const AuthPage = () => {
 
       showAlert(response.message || 'Registration successful! Please check your email for OTP.', 'success');
 
-      // Show OTP verification screen
       setOtpData({ email, otp: '', resendCooldown: 60 });
       setShowOTPVerification(true);
 
-      // Clear signup form
       setSignupData({
         username: '',
         displayName: '',
@@ -269,7 +261,6 @@ const AuthPage = () => {
     }
   };
 
-  // Handle OTP verification
   const handleOTPVerification = async (e) => {
     e.preventDefault();
 
@@ -285,13 +276,10 @@ const AuthPage = () => {
 
       showAlert('Email verified successfully! Please login to continue.', 'success');
 
-      // Always redirect to login form after successful verification
       setTimeout(() => {
         setShowOTPVerification(false);
         setIsLogin(true);
         setLoginData({ email: otpData.email, password: '', rememberMe: false });
-
-        // Clear OTP data
         setOtpData({ email: '', otp: '', resendCooldown: 0 });
       }, 2000);
 
@@ -303,7 +291,6 @@ const AuthPage = () => {
     }
   };
 
-  // Handle OTP resend
   const handleResendOTP = async () => {
     if (otpData.resendCooldown > 0) {
       showAlert(`Please wait ${otpData.resendCooldown} seconds before resending`, 'error');
@@ -324,7 +311,6 @@ const AuthPage = () => {
     }
   };
 
-  // Check password strength
   const checkPasswordStrength = (password) => {
     if (!password) {
       setPasswordStrength({
@@ -368,12 +354,10 @@ const AuthPage = () => {
     setPasswordStrength({ level, text, checks });
   };
 
-  // Handle social auth
   const handleSocialAuth = (provider) => {
     showAlert(`${provider} authentication coming soon!`, 'error');
   };
 
-  // Toggle password visibility
   const togglePasswordVisibility = (field) => {
     setShowPassword(prev => ({ ...prev, [field]: !prev[field] }));
   };
@@ -391,7 +375,7 @@ const AuthPage = () => {
         <div className="auth-card">
           <div className="brand">
             <div className="logo">
-              <img src="./nomadnet.svg" alt="Nomad Net Logo" />
+              <img src={logo} alt="Nomad Net Logo" />
             </div>
             <h1>Verify Your Email</h1>
             <p className="tagline">Enter the OTP sent to {otpData.email}</p>
@@ -476,25 +460,21 @@ const AuthPage = () => {
 
   return (
     <div className="container">
-      {/* Background Animation */}
       <div className="bg-animation">
         <div className="circle circle-1"></div>
         <div className="circle circle-2"></div>
         <div className="circle circle-3"></div>
       </div>
 
-      {/* Auth Card */}
       <div className="auth-card">
-        {/* Logo & Branding */}
         <div className="brand">
           <div className="logo">
-            <img src="./nomadnet.svg" alt="Nomad Net Logo" />
+            <img src={logo} alt="Nomad Net Logo" />
           </div>
           <h1>Nomad Net</h1>
           <p className="tagline">Connect with travelers worldwide</p>
         </div>
 
-        {/* Login Form */}
         {isLogin ? (
           <form onSubmit={handleLogin} className="auth-form active">
             <h2>Welcome Back</h2>
@@ -611,7 +591,6 @@ const AuthPage = () => {
             </p>
           </form>
         ) : (
-          // Signup Form
           <form onSubmit={handleSignup} className="auth-form active">
             <h2>Join Nomad Net</h2>
             <p className="subtitle">Start connecting with travelers today</p>

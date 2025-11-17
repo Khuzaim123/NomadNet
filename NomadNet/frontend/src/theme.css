@@ -1,0 +1,36 @@
+/* Import a nice font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --peach: #fcd5ce;
+  --cream: #faf0e6;
+  --mint-light: #d8e2dc;
+  --sage: #a8c4a0;
+  --forest: #6b8e7c;
+  --primary: #6b8e7c;
+  --success: #a8c4a0;
+  --danger: #e07a5f;
+  --text-dark: #2c3e50;
+  --text-light: #5a6a6a;
+  --white: #ffffff;
+  --gray-light: #f1f3f5;
+  --gray-dark: #adb5bd;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--cream);
+  color: var(--text-dark);
+  line-height: 1.6;
+}
+
+button {
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
