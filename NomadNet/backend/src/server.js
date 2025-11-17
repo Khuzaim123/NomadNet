@@ -28,8 +28,17 @@ app.use((req, res, next) => {
 
 // ======================
 // Body Parsing Middleware
+// ⚠️ IMPORTANT: Don't use express.json() for multipart routes
 // ======================
-app.use(express.json());
+app.use((req, res, next) => {
+  // Skip body parsing for multipart/form-data (multer will handle it)
+  if (req.headers['content-type']?.includes('multipart/form-data')) {
+    console.log('📦 Multipart request detected - skipping body parser');
+    return next();
+  }
+  express.json()(req, res, next);
+});
+
 app.use(express.urlencoded({ extended: true }));
 
 // ======================
@@ -38,6 +47,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
   console.log(`[${timestamp}] 📨 ${req.method.padEnd(6)} ${req.path}`);
+  if (req.headers['content-type']) {
+    console.log(`           Content-Type: ${req.headers['content-type']}`);
+  }
   next();
 });
 
@@ -59,7 +71,7 @@ try {
   console.error('❌ CRITICAL: Failed to load authRoutes');
   console.error('   Error:', error.message);
   console.error('   Stack:', error.stack);
-  process.exit(1); // Exit on auth route failure
+  process.exit(1);
 }
 
 // Load User Routes
@@ -75,7 +87,7 @@ try {
   console.error('   1. Check if src/routes/userRoutes.js exists');
   console.error('   2. Check if userController.js exists');
   console.error('   3. Run: node -c src/routes/userRoutes.js');
-  process.exit(1); // Exit on user route failure
+  process.exit(1);
 }
 
 // ======================
@@ -100,6 +112,9 @@ app.get('/api/health', (req, res) => {
     message: 'NomadNet API is running',
     timestamp: new Date().toISOString(),
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    cloudinary: {
+      configured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY)
+    },
     routes: {
       auth: true,
       users: true
@@ -119,13 +134,11 @@ app.get('/api/debug/routes', (req, res) => {
   
   app._router.stack.forEach((middleware) => {
     if (middleware.route) {
-      // Direct route
       routes.push({
         path: middleware.route.path,
         methods: Object.keys(middleware.route.methods)
       });
     } else if (middleware.name === 'router') {
-      // Router middleware
       middleware.handle.stack.forEach((handler) => {
         if (handler.route) {
           const path = middleware.regexp.source
@@ -174,8 +187,13 @@ app.use((req, res) => {
 // Global Error Handler
 // ======================
 app.use((err, req, res, next) => {
-  console.error('❌ Server Error:', err.message);
-  console.error('   Stack:', err.stack);
+  console.error('\n❌ ============ ERROR HANDLER ============');
+  console.error('Message:', err.message);
+  console.error('Status:', err.status || 500);
+  console.error('Path:', req.path);
+  console.error('Method:', req.method);
+  console.error('Stack:', err.stack);
+  console.error('=========================================\n');
   
   res.status(err.status || 500).json({
     status: 'error',
@@ -202,7 +220,6 @@ mongoose.connection.once('open', async () => {
     await User.createIndexes();
     console.log('✅ New indexes created');
     
-    // Show current indexes
     const indexes = await User.collection.indexes();
     console.log('📋 Active indexes:', indexes.map(i => i.name).join(', '));
     console.log('');
@@ -231,6 +248,7 @@ const server = app.listen(PORT, () => {
   console.log('='.repeat(60));
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`💾 Database: ${process.env.MONGODB_URI ? 'Configured' : 'NOT CONFIGURED'}`);
+  console.log(`☁️  Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME ? 'Configured' : 'NOT CONFIGURED'}`);
   console.log('='.repeat(60) + '\n');
   
   console.log('✅ Server is ready to accept requests\n');

@@ -14,7 +14,7 @@ console.log('✅ User controller loaded');
 console.log('   Functions:', Object.keys(userController).join(', '));
 
 // ==========================================
-// 2️⃣ Upload Middleware (Optional - with fallback)
+// 2️⃣ Upload Middleware (with better error handling)
 // ==========================================
 
 let uploadMiddleware;
@@ -22,18 +22,8 @@ try {
   uploadMiddleware = require('../middleware/uploadMiddleware');
   console.log('✅ Upload middleware loaded');
 } catch (error) {
-  console.warn('⚠️  Upload middleware not found - using fallback');
-  uploadMiddleware = {
-    single: () => (req, res, next) => {
-      if (!req.file) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'File upload not configured. Please set up Cloudinary.'
-        });
-      }
-      next();
-    }
-  };
+  console.error('❌ Upload middleware failed to load:', error.message);
+  process.exit(1); // Exit if upload middleware is missing
 }
 
 // ==========================================
@@ -72,8 +62,20 @@ router.get('/:id', userController.getUserById);
 // Update profile (protected)
 router.put('/:id', protect, userController.updateProfile);
 
-// Upload avatar (protected)
-router.post('/:id/avatar', protect, uploadMiddleware.single('avatar'), userController.uploadAvatar);
+// ✅ AVATAR UPLOAD - with detailed logging
+router.post('/:id/avatar', 
+  (req, res, next) => {
+    console.log('\n🎯 ============ AVATAR UPLOAD ROUTE HIT ============');
+    console.log('User ID:', req.params.id);
+    console.log('Auth header:', req.headers.authorization ? 'Present' : 'Missing');
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('==================================================\n');
+    next();
+  },
+  protect, 
+  uploadMiddleware.single('avatar'), 
+  userController.uploadAvatar
+);
 
 // Update location (protected)
 router.patch('/:id/location', protect, userController.updateLocation);
