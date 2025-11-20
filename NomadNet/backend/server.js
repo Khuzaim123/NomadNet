@@ -18,9 +18,34 @@ const app = express();
 // Security & CORS (Before Routes)
 // ======================
 app.use(helmet()); // Security headers
+
+// ✅ CORS Configuration
+const allowedOrigins = [
+  'http://localhost:5173',      // Vite default
+  'http://localhost:3000',      // React default
+  'http://127.0.0.1:5173',      // Localhost alternative
+  'http://127.0.0.1:3000',
+  process.env.CLIENT_URL        // Production URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log(`⚠️  CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['set-cookie'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 // ======================
@@ -36,6 +61,9 @@ app.use(morgan('dev')); // Request logging
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
   console.log(`[${timestamp}] 📨 ${req.method.padEnd(6)} ${req.path}`);
+  if (req.method === 'OPTIONS') {
+    console.log(`           ✈️  Preflight request from: ${req.headers.origin || 'unknown'}`);
+  }
   next();
 });
 
@@ -57,7 +85,7 @@ try {
   console.error('❌ CRITICAL: Failed to load authRoutes');
   console.error('   Error:', error.message);
   console.error('   Stack:', error.stack);
-  process.exit(1); // Exit on auth route failure
+  process.exit(1);
 }
 
 // Load User Routes
@@ -73,7 +101,7 @@ try {
   console.error('   1. Check if src/routes/userRoutes.js exists');
   console.error('   2. Check if src/controllers/userController.js exists');
   console.error('   3. Run: node -c src/routes/userRoutes.js');
-  process.exit(1); // Exit on user route failure
+  process.exit(1);
 }
 
 // Load Marketplace Routes
@@ -89,7 +117,7 @@ try {
   console.error('   1. Check if src/routes/marketplaceRoutes.js exists');
   console.error('   2. Check if src/controllers/marketplaceController.js exists');
   console.error('   3. Run: node -c src/routes/marketplaceRoutes.js');
-  process.exit(1); // Exit on marketplace route failure
+  process.exit(1);
 }
 
 // ======================
@@ -112,11 +140,26 @@ console.log('✅ Marketplace routes mounted at /api/marketplace\n');
 // Health Check
 // ======================
 app.get('/api/health', (req, res) => {
+  const mongoStatus = mongoose.connection.readyState;
+  const mongoStateMap = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+
   res.json({
     status: 'success',
     message: 'NomadNet API is running',
     timestamp: new Date().toISOString(),
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    mongodb: {
+      status: mongoStateMap[mongoStatus],
+      ready: mongoStatus === 1
+    },
+    cors: {
+      allowedOrigins: allowedOrigins,
+      credentials: true
+    },
     routes: {
       auth: true,
       users: true,
@@ -131,6 +174,18 @@ app.get('/api/health', (req, res) => {
 });
 
 // ======================
+// CORS Test Endpoint
+// ======================
+app.get('/api/cors-test', (req, res) => {
+  res.json({
+    status: 'success',
+    message: 'CORS is working correctly!',
+    origin: req.headers.origin || 'No origin header',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ======================
 // List All Routes (Debug Endpoint)
 // ======================
 app.get('/api/debug/routes', (req, res) => {
@@ -138,13 +193,11 @@ app.get('/api/debug/routes', (req, res) => {
   
   app._router.stack.forEach((middleware) => {
     if (middleware.route) {
-      // Direct route
       routes.push({
         path: middleware.route.path,
         methods: Object.keys(middleware.route.methods)
       });
     } else if (middleware.name === 'router') {
-      // Router middleware
       middleware.handle.stack.forEach((handler) => {
         if (handler.route) {
           const path = middleware.regexp.source
@@ -165,7 +218,8 @@ app.get('/api/debug/routes', (req, res) => {
   res.json({
     status: 'success',
     totalRoutes: routes.length,
-    routes: routes
+    routes: routes,
+    allowedOrigins: allowedOrigins
   });
 });
 
@@ -182,6 +236,7 @@ app.use((req, res) => {
     method: req.method,
     availableEndpoints: {
       health: '/api/health',
+      corsTest: '/api/cors-test',
       routes: '/api/debug/routes',
       authTest: '/api/auth/test',
       usersTest: '/api/users/test',
@@ -197,11 +252,43 @@ app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err.message);
   console.error('   Stack:', err.stack);
   
+  // Handle CORS errors specifically
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({
+      status: 'error',
+      message: 'CORS policy violation',
+      origin: req.headers.origin,
+      allowedOrigins: allowedOrigins,
+      hint: 'Make sure your frontend is running on an allowed origin'
+    });
+  }
+  
   res.status(err.status || 500).json({
     status: 'error',
     message: err.message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
+});
+
+// ======================
+// MongoDB Connection Handlers
+// ======================
+mongoose.connection.on('connected', () => {
+  console.log('\n✅ MongoDB Connected Successfully');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('\n❌ MongoDB Connection Error:', err.message);
+  console.error('\n💡 Troubleshooting:');
+  console.error('   1. Make sure MongoDB is running');
+  console.error('   2. Windows: net start MongoDB');
+  console.error('   3. macOS/Linux: sudo systemctl start mongod');
+  console.error('   4. Or use MongoDB Atlas cloud database');
+  console.error('   5. Check your MONGODB_URI in .env file\n');
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('\n⚠️  MongoDB Disconnected');
 });
 
 // ======================
@@ -217,8 +304,14 @@ mongoose.connection.once('open', async () => {
     const MarketplaceItem = require('./src/models/MarketplaceItem');
     
     console.log('🔄 Checking User indexes...');
-    await User.collection.dropIndexes();
-    console.log('✅ Old User indexes dropped');
+    try {
+      await User.collection.dropIndexes();
+      console.log('✅ Old User indexes dropped');
+    } catch (err) {
+      if (err.message.includes('ns not found')) {
+        console.log('ℹ️  No existing User collection');
+      }
+    }
     
     await User.createIndexes();
     console.log('✅ New User indexes created');
@@ -254,13 +347,14 @@ mongoose.connection.once('open', async () => {
 // ======================
 // Start Server
 // ======================
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 39300;
 
 const server = app.listen(PORT, () => {
   console.log('\n' + '='.repeat(60));
   console.log(`🚀 SERVER RUNNING ON PORT ${PORT}`);
   console.log('='.repeat(60));
   console.log(`📡 Health Check:  http://localhost:${PORT}/api/health`);
+  console.log(`🔍 CORS Test:     http://localhost:${PORT}/api/cors-test`);
   console.log(`🔍 Debug Routes:  http://localhost:${PORT}/api/debug/routes`);
   console.log(`🔐 Auth Test:     http://localhost:${PORT}/api/auth/test`);
   console.log(`👤 Users Test:    http://localhost:${PORT}/api/users/test`);
@@ -268,9 +362,16 @@ const server = app.listen(PORT, () => {
   console.log('='.repeat(60));
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`💾 Database: ${process.env.MONGODB_URI ? 'Configured' : 'NOT CONFIGURED'}`);
+  console.log(`🌐 CORS Origins: ${allowedOrigins.join(', ')}`);
   console.log('='.repeat(60) + '\n');
   
-  console.log('✅ Server is ready to accept requests\n');
+  if (mongoose.connection.readyState !== 1) {
+    console.log('⚠️  WARNING: MongoDB is not connected yet!');
+    console.log('   Server is running but database operations will fail.');
+    console.log('   Please start MongoDB and restart the server.\n');
+  } else {
+    console.log('✅ Server is ready to accept requests\n');
+  }
 });
 
 // ======================
@@ -312,9 +413,15 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('\n❌ UNHANDLED REJECTION:');
   console.error('   Reason:', reason);
-  console.error('   Promise:', promise);
-  console.error('\n🛑 Server will shut down...\n');
-  process.exit(1);
+  
+  // Don't crash on MongoDB connection errors during startup
+  if (reason && reason.message && reason.message.includes('ECONNREFUSED')) {
+    console.error('\n⚠️  MongoDB connection failed. Please start MongoDB.');
+    console.error('   Server will continue running but database operations will fail.\n');
+  } else {
+    console.error('\n🛑 Server will shut down...\n');
+    process.exit(1);
+  }
 });
 
 module.exports = app;
