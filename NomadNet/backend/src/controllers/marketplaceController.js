@@ -6,6 +6,9 @@ const { sendMarketplaceRequestEmail } = require('../utils/emailService');
 // @desc    Create new marketplace listing
 // @route   POST /api/marketplace
 // @access  Private
+// @desc    Create new marketplace listing
+// @route   POST /api/marketplace
+// @access  Private
 exports.createListing = async (req, res) => {
   try {
     const {
@@ -13,6 +16,7 @@ exports.createListing = async (req, res) => {
       title,
       description,
       category,
+      otherCategoryName,  // ✅ Already extracted
       condition,
       priceType,
       price,
@@ -26,6 +30,14 @@ exports.createListing = async (req, res) => {
       return res.status(400).json({
         status: 'error',
         message: 'Please provide type, title, description, and category'
+      });
+    }
+
+    // ✅ Validate otherCategoryName when category is 'other'
+    if (category === 'other' && !otherCategoryName) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please specify category name when selecting "other"'
       });
     }
 
@@ -71,6 +83,11 @@ exports.createListing = async (req, res) => {
       priceType: priceType || 'free',
       deliveryOptions: deliveryOptions || ['pickup']
     };
+
+    // ✅ ADD THIS - Include otherCategoryName when category is 'other'
+    if (category === 'other' && otherCategoryName) {
+      listingData.otherCategoryName = otherCategoryName;
+    }
 
     // Add optional fields
     if (condition) listingData.condition = condition;
@@ -338,7 +355,8 @@ exports.updateListing = async (req, res) => {
       'availableUntil',
       'priceType',
       'price',
-      'deliveryOptions'
+      'deliveryOptions',
+      'otherCategoryName'
     ];
 
     const updates = {};
@@ -347,6 +365,13 @@ exports.updateListing = async (req, res) => {
         updates[key] = req.body[key];
       }
     });
+
+    if (req.body.category === 'other' && !req.body.otherCategoryName && !listing.otherCategoryName) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please specify category name when selecting "other"'
+      });
+    }
 
     // Handle new photo uploads
     if (req.files && req.files.length > 0) {
