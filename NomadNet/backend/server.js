@@ -1,9 +1,9 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
-const cors = require('cors'); // Added from root
-const morgan = require('morgan'); // Added from root
-const helmet = require('helmet'); // Added from root
+const cors = require('cors');
+const morgan = require('morgan');
+const helmet = require('helmet');
 const connectDB = require('./src/config/database');
 
 // ======================
@@ -46,7 +46,7 @@ console.log('\n' + '='.repeat(60));
 console.log('🔄 LOADING ROUTES...');
 console.log('='.repeat(60) + '\n');
 
-let authRoutes, userRoutes;
+let authRoutes, userRoutes, marketplaceRoutes;
 
 // Load Auth Routes
 try {
@@ -76,6 +76,22 @@ try {
   process.exit(1); // Exit on user route failure
 }
 
+// Load Marketplace Routes
+try {
+  console.log('🔍 Loading marketplaceRoutes from:', __dirname + '/src/routes/marketplaceRoutes.js');
+  marketplaceRoutes = require('./src/routes/marketplaceRoutes');
+  console.log('✅ Marketplace routes loaded successfully\n');
+} catch (error) {
+  console.error('❌ CRITICAL: Failed to load marketplaceRoutes');
+  console.error('   Error:', error.message);
+  console.error('   Stack:', error.stack);
+  console.error('\n💡 Troubleshooting:');
+  console.error('   1. Check if src/routes/marketplaceRoutes.js exists');
+  console.error('   2. Check if src/controllers/marketplaceController.js exists');
+  console.error('   3. Run: node -c src/routes/marketplaceRoutes.js');
+  process.exit(1); // Exit on marketplace route failure
+}
+
 // ======================
 // Mount Routes
 // ======================
@@ -87,7 +103,10 @@ app.use('/api/auth', authRoutes);
 console.log('✅ Auth routes mounted at /api/auth');
 
 app.use('/api/users', userRoutes);
-console.log('✅ User routes mounted at /api/users\n');
+console.log('✅ User routes mounted at /api/users');
+
+app.use('/api/marketplace', marketplaceRoutes);
+console.log('✅ Marketplace routes mounted at /api/marketplace\n');
 
 // ======================
 // Health Check
@@ -100,11 +119,13 @@ app.get('/api/health', (req, res) => {
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     routes: {
       auth: true,
-      users: true
+      users: true,
+      marketplace: true
     },
     endpoints: {
       auth: '/api/auth/test',
-      users: '/api/users/test'
+      users: '/api/users/test',
+      marketplace: '/api/marketplace'
     }
   });
 });
@@ -163,7 +184,8 @@ app.use((req, res) => {
       health: '/api/health',
       routes: '/api/debug/routes',
       authTest: '/api/auth/test',
-      usersTest: '/api/users/test'
+      usersTest: '/api/users/test',
+      marketplace: '/api/marketplace'
     }
   });
 });
@@ -192,21 +214,37 @@ mongoose.connection.once('open', async () => {
   
   try {
     const User = require('./src/models/User');
-    console.log('🔄 Checking indexes...');
+    const MarketplaceItem = require('./src/models/MarketplaceItem');
     
+    console.log('🔄 Checking User indexes...');
     await User.collection.dropIndexes();
-    console.log('✅ Old indexes dropped');
+    console.log('✅ Old User indexes dropped');
     
     await User.createIndexes();
-    console.log('✅ New indexes created');
+    console.log('✅ New User indexes created');
     
-    // Show current indexes
-    const indexes = await User.collection.indexes();
-    console.log('📋 Active indexes:', indexes.map(i => i.name).join(', '));
+    const userIndexes = await User.collection.indexes();
+    console.log('📋 Active User indexes:', userIndexes.map(i => i.name).join(', '));
+    
+    console.log('\n🔄 Checking MarketplaceItem indexes...');
+    try {
+      await MarketplaceItem.collection.dropIndexes();
+      console.log('✅ Old MarketplaceItem indexes dropped');
+    } catch (err) {
+      if (err.message.includes('ns not found')) {
+        console.log('ℹ️  No existing MarketplaceItem collection (will be created on first listing)');
+      }
+    }
+    
+    await MarketplaceItem.createIndexes();
+    console.log('✅ New MarketplaceItem indexes created');
+    
+    const marketplaceIndexes = await MarketplaceItem.collection.indexes();
+    console.log('📋 Active MarketplaceItem indexes:', marketplaceIndexes.map(i => i.name).join(', '));
     console.log('');
   } catch (error) {
     if (error.message.includes('ns not found')) {
-      console.log('ℹ️  No existing collection (will be created on first user)');
+      console.log('ℹ️  No existing collection (will be created on first use)');
     } else {
       console.error('⚠️  Index operation failed:', error.message);
     }
@@ -226,6 +264,7 @@ const server = app.listen(PORT, () => {
   console.log(`🔍 Debug Routes:  http://localhost:${PORT}/api/debug/routes`);
   console.log(`🔐 Auth Test:     http://localhost:${PORT}/api/auth/test`);
   console.log(`👤 Users Test:    http://localhost:${PORT}/api/users/test`);
+  console.log(`🛍️  Marketplace:   http://localhost:${PORT}/api/marketplace`);
   console.log('='.repeat(60));
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`💾 Database: ${process.env.MONGODB_URI ? 'Configured' : 'NOT CONFIGURED'}`);
