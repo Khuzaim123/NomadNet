@@ -8,7 +8,7 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS.replace(/\s/g, '')
- // Remove any spaces from app password
+    // Remove any spaces from app password
   },
   tls: {
     rejectUnauthorized: false
@@ -374,9 +374,118 @@ Happy travels! ✈️🌍
   await transporter.sendMail(message);
 };
 
+// ✅ Send Marketplace Request Notification
+const sendMarketplaceRequestEmail = async (
+  ownerEmail,
+  ownerUsername,
+  requesterUsername,
+  requesterDisplayName,
+  listingTitle,
+  listingType,
+  message,
+  listingId
+) => {
+  const emailMessage = {
+    from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
+    to: ownerEmail,
+    subject: `New Request for Your ${listingType.charAt(0).toUpperCase() + listingType.slice(1)} - ${listingTitle}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background: #f4f4f4; }
+          .email-container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 40px 20px; text-align: center; }
+          .header h1 { font-size: 28px; margin-bottom: 10px; }
+          .content { padding: 40px 30px; background: white; }
+          .greeting { font-size: 18px; color: #333; margin-bottom: 20px; }
+          .message { color: #666; margin-bottom: 20px; line-height: 1.8; }
+          .listing-box { background: #f8f9fa; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #11998e; }
+          .listing-title { font-size: 20px; font-weight: bold; color: #11998e; margin-bottom: 10px; }
+          .listing-type { display: inline-block; background: #11998e; color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; margin-bottom: 15px; }
+          .requester-message { background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 15px 0; }
+          .message-label { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 5px; }
+          .message-content { color: #333; font-style: italic; }
+          .requester-info { margin: 15px 0; }
+          .requester-name { font-weight: bold; color: #11998e; }
+          .cta { text-align: center; margin: 30px 0; }
+          .cta-button { display: inline-block; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 50px; font-weight: bold; }
+          .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="email-container">
+          <div class="header">
+            <h1>🎯 New Request Received!</h1>
+            <p>Someone is interested in your listing</p>
+          </div>
+          
+          <div class="content">
+            <p class="greeting">Hi <strong>${ownerUsername}</strong>,</p>
+            
+            <p class="message">
+              Great news! <strong>${requesterDisplayName}</strong> (@${requesterUsername}) is interested in your marketplace listing:
+            </p>
+            
+            <div class="listing-box">
+              <div class="listing-type">${listingType.toUpperCase()}</div>
+              <div class="listing-title">${listingTitle}</div>
+              
+              <div class="requester-info">
+                <div class="message-label">Requested by:</div>
+                <div class="requester-name">${requesterDisplayName} (@${requesterUsername})</div>
+              </div>
+              
+              ${message ? `
+              <div class="requester-message">
+                <div class="message-label">Message from requester:</div>
+                <div class="message-content">"${message}"</div>
+              </div>
+              ` : ''}
+            </div>
+            
+            <p class="message">
+              Log in to your NomadNet account to view the request details and respond to ${requesterDisplayName}.
+            </p>
+            
+            <div class="cta">
+              <a href="${process.env.CLIENT_URL}/marketplace/my-listings" class="cta-button">View Request</a>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p class="footer-text">© ${new Date().getFullYear()} NomadNet. All rights reserved.</p>
+            <p class="footer-text">This is an automated notification. Please do not reply to this email.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `
+Hi ${ownerUsername},
+
+${requesterDisplayName} (@${requesterUsername}) is interested in your ${listingType}: ${listingTitle}
+
+${message ? `Message: "${message}"` : ''}
+
+Log in to view and respond to this request.
+
+Visit: ${process.env.CLIENT_URL}/marketplace/my-listings
+
+© ${new Date().getFullYear()} NomadNet
+    `
+  };
+
+  await transporter.sendMail(emailMessage);
+};
+
+// Add to exports
 module.exports = {
   sendRegistrationOTP,
   sendPasswordResetOTP,
   sendPasswordChangeOTP,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendMarketplaceRequestEmail
 };
