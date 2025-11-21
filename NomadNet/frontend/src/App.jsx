@@ -10,6 +10,7 @@ import MarketplacePage from './pages/MarketplacePage';
 import CreateListingPage from './pages/CreateListingPage';
 import ListingDetailsPage from './pages/ListingDetailsPage';
 import MyListingsPage from './pages/MyListingsPage';
+import EditListingPage from './pages/EditListingPage';
 
 import './App.css';
 
@@ -29,6 +30,7 @@ function App() {
           <Route path="/marketplace/create" element={<CreateListingPage />} />
           <Route path="/marketplace/my-listings" element={<MyListingsPage />} />
           <Route path="/marketplace/:id" element={<ListingDetailsPage />} />
+          <Route path="/marketplace/edit/:id" element={<EditListingPage />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />
