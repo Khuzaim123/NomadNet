@@ -266,17 +266,24 @@ const ListingDetailsPage = () => {
             <div className="action-buttons">
               {isOwner ? (
                 <>
+                  {/* ✅ ADDED: Edit Button */}
                   <Link 
-                    to={`/marketplace/my-listings`} 
+                    to={`/marketplace/edit/${listing._id}`} 
                     className="primary-action-btn"
                   >
-                    Manage Listing
+                    ✏️ Edit Listing
+                  </Link>
+                  <Link 
+                    to={`/marketplace/my-listings`} 
+                    className="secondary-action-btn"
+                  >
+                    📋 View All My Listings
                   </Link>
                   <button 
                     className="danger-action-btn"
                     onClick={handleDeleteListing}
                   >
-                    Delete Listing
+                    🗑️ Delete Listing
                   </button>
                 </>
               ) : listing.available ? (

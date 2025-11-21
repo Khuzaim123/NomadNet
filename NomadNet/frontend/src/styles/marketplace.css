@@ -1790,3 +1790,48 @@
 .modal-content::-webkit-scrollbar-thumb:hover {
   background: #818cf8;
 }
+
+/* src/styles/marketplace.css */
+
+/* Secondary Action Button */
+.secondary-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.secondary-action-btn:hover {
+  background: var(--gray-200);
+  border-color: var(--gray-400);
+}
+
+/* Action Buttons Layout */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+/* Existing Photos Section */
+.existing-photos-section,
+.new-photos-section {
+  margin-bottom: 1.5rem;
+}
+
+.existing-photos-section h4,
+.new-photos-section h4 {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+  margin-bottom: 0.75rem;
+}
