@@ -1,3 +1,4 @@
+// middleware/marketplaceValidator.js
 const { body, validationResult } = require('express-validator');
 
 // ======================
@@ -112,6 +113,7 @@ const updateListingValidation = [
     .trim()
     .isLength({ min: 10, max: 1000 })
     .withMessage('Description must be between 10 and 1000 characters'),
+
   body('otherCategoryName')
     .if(body('category').equals('other'))
     .notEmpty()

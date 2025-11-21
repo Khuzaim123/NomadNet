@@ -1,13 +1,13 @@
 // src/pages/CreateListingPage.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  createListing, 
-  CATEGORIES, 
-  TYPES, 
-  PRICE_TYPES, 
+import {
+  createListing,
+  CATEGORIES,
+  TYPES,
+  PRICE_TYPES,
   CONDITIONS,
-  DELIVERY_OPTIONS 
+  DELIVERY_OPTIONS
 } from '../services/marketplaceService';
 import Spinner from '../components/Spinner';
 import '../styles/marketplace.css';
@@ -17,7 +17,7 @@ const CreateListingPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     type: 'item',
     title: '',
@@ -38,7 +38,7 @@ const CreateListingPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
+
     if (name.startsWith('price.')) {
       const priceField = name.split('.')[1];
       setFormData(prev => ({
@@ -75,7 +75,7 @@ const CreateListingPage = () => {
 
   const handlePhotoChange = (e) => {
     const files = Array.from(e.target.files);
-    
+
     if (files.length + photos.length > 5) {
       setError('Maximum 5 photos allowed');
       return;
@@ -107,8 +107,16 @@ const CreateListingPage = () => {
       setError('Title is required');
       return;
     }
+    if (formData.title.trim().length < 3) {
+      setError('Title must be at least 3 characters');
+      return;
+    }
     if (!formData.description.trim()) {
       setError('Description is required');
+      return;
+    }
+    if (formData.description.trim().length < 10) {
+      setError('Description must be at least 10 characters');
       return;
     }
     if (!formData.category) {
@@ -123,7 +131,7 @@ const CreateListingPage = () => {
       setError('Condition is required for items');
       return;
     }
-    if (formData.priceType === 'paid' && !formData.price.amount) {
+    if (formData.priceType === 'paid' && (!formData.price.amount || formData.price.amount <= 0)) {
       setError('Price is required for paid listings');
       return;
     }
@@ -136,34 +144,46 @@ const CreateListingPage = () => {
       setLoading(true);
 
       const listingData = {
-        ...formData,
+        type: formData.type,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        priceType: formData.priceType,
+        deliveryOptions: formData.deliveryOptions,
         photos: photos
       };
 
-      // Remove otherCategoryName if category is not 'other'
-      if (formData.category !== 'other') {
-        delete listingData.otherCategoryName;
+      if (formData.category === 'other' && formData.otherCategoryName.trim()) {
+        listingData.otherCategoryName = formData.otherCategoryName.trim();
       }
 
-      // Remove price if not paid
-      if (formData.priceType !== 'paid') {
-        delete listingData.price;
+      if (formData.type === 'item' && formData.condition) {
+        listingData.condition = formData.condition;
       }
 
-      // Remove condition if not item
-      if (formData.type !== 'item') {
-        delete listingData.condition;
+      if (formData.priceType === 'paid' && formData.price.amount) {
+        listingData.price = {
+          amount: parseFloat(formData.price.amount),
+          currency: formData.price.currency
+        };
       }
 
       const response = await createListing(listingData);
-      
+
       setSuccess(true);
       setTimeout(() => {
         navigate(`/marketplace/${response.data.listing._id}`);
       }, 1500);
     } catch (err) {
       console.error('Create listing error:', err);
-      setError(err.response?.data?.message || 'Failed to create listing');
+
+      // ✅ ADD: Show backend validation errors
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+        const errorMessages = err.response.data.errors.map(e => e.message).join(', ');
+        setError(errorMessages);
+      } else {
+        setError(err.response?.data?.message || 'Failed to create listing');
+      }
     } finally {
       setLoading(false);
     }
@@ -215,7 +235,7 @@ const CreateListingPage = () => {
             {/* Basic Information */}
             <div className="form-section">
               <h3 className="form-section-title">Basic Information</h3>
-              
+
               <div className="form-group">
                 <label htmlFor="title">Title *</label>
                 <input
@@ -238,12 +258,17 @@ const CreateListingPage = () => {
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
-                  placeholder="Describe your offering in detail..."
+                  placeholder="Describe your offering in detail... (minimum 10 characters)"
                   rows={5}
                   maxLength={1000}
                   required
                 />
-                <span className="char-count">{formData.description.length}/1000</span>
+                <span className="char-count">
+                  {formData.description.length}/1000
+                  {formData.description.length < 10 && formData.description.length > 0 &&
+                    <span style={{ color: 'red' }}> (min 10 chars)</span>
+                  }
+                </span>
               </div>
 
               <div className="form-group">
@@ -307,7 +332,7 @@ const CreateListingPage = () => {
             {/* Pricing */}
             <div className="form-section">
               <h3 className="form-section-title">Pricing</h3>
-              
+
               <div className="price-type-selector">
                 {PRICE_TYPES.map(price => (
                   <label key={price.value} className="price-type-option">
@@ -376,7 +401,7 @@ const CreateListingPage = () => {
             {/* Photos */}
             <div className="form-section">
               <h3 className="form-section-title">Photos (Max 5)</h3>
-              
+
               <div className="photo-upload-container">
                 {photoPreviews.map((preview, index) => (
                   <div key={index} className="photo-preview">
@@ -390,7 +415,7 @@ const CreateListingPage = () => {
                     </button>
                   </div>
                 ))}
-                
+
                 {photos.length < 5 && (
                   <label className="photo-upload-btn">
                     <input
