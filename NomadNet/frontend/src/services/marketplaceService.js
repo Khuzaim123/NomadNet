@@ -106,14 +106,14 @@ export const createListing = async (listingData) => {
       
       formData.append('priceType', listingData.priceType);
       
-      if (listingData.price) {
+      if (listingData.price && listingData.price.amount) {
         formData.append('price[amount]', listingData.price.amount);
         formData.append('price[currency]', listingData.price.currency || 'USD');
       }
       
-      // Add delivery options
-      listingData.deliveryOptions.forEach((option, index) => {
-        formData.append(`deliveryOptions[${index}]`, option);
+      // ✅ FIX: Add delivery options with [] suffix (not [0], [1], etc.)
+      listingData.deliveryOptions.forEach((option) => {
+        formData.append('deliveryOptions[]', option);
       });
       
       // Add photos
@@ -149,11 +149,14 @@ export const updateListing = async (id, updateData) => {
             formData.append('photos', photo);
           });
         } else if (key === 'price' && updateData.price) {
-          formData.append('price[amount]', updateData.price.amount);
-          formData.append('price[currency]', updateData.price.currency || 'USD');
+          if (updateData.price.amount) {
+            formData.append('price[amount]', updateData.price.amount);
+            formData.append('price[currency]', updateData.price.currency || 'USD');
+          }
         } else if (key === 'deliveryOptions') {
-          updateData.deliveryOptions.forEach((option, index) => {
-            formData.append(`deliveryOptions[${index}]`, option);
+          // ✅ FIX: Use [] suffix
+          updateData.deliveryOptions.forEach((option) => {
+            formData.append('deliveryOptions[]', option);
           });
         } else {
           formData.append(key, updateData[key]);
