@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import logo from '../assets/nomadnet_logo.svg';
 import '../styles/auth.css';
 import {
@@ -11,7 +12,6 @@ import {
   getToken,
   clearAuth
 } from '../services/authService';
-import { useNavigate } from 'react-router-dom';
 
 const AuthPage = () => {
   const navigate = useNavigate();
@@ -67,13 +67,43 @@ const AuthPage = () => {
     }
   });
 
-  // Check if user is already logged in
+  // Show alert function
+  const showAlert = (message, type = 'error') => {
+    setAlert({ show: true, message, type });
+  };
+
+  // ✅ Verify token - MOVED BEFORE useEffect
+  const verifyToken = useCallback(async (token) => {
+    try {
+      const response = await getCurrentUser(token);
+      console.log('🔍 Token verification response:', response);
+      
+      // Handle multiple possible response structures
+      const user = response?.data?.user || response?.user || response?.data || response;
+      
+      if (user?.username) {
+        console.log('✅ Redirecting to profile:', user.username);
+        navigate(`/profile/${user.username}`);
+      } else {
+        console.warn('⚠️ No username found in response, clearing auth');
+        clearAuth();
+      }
+    } catch (error) {
+      console.error('❌ Token verification error:', error);
+      clearAuth();
+    }
+  }, [navigate]);
+
+  // ✅ Check if user is already logged in
   useEffect(() => {
     const token = getToken();
     if (token) {
+      console.log('🔑 Found stored token, verifying...');
       verifyToken(token);
+    } else {
+      console.log('🔓 No token found');
     }
-  }, []);
+  }, [verifyToken]);
 
   // Auto-hide alerts
   useEffect(() => {
@@ -95,25 +125,6 @@ const AuthPage = () => {
     }
   }, [otpData.resendCooldown]);
 
-  // Show alert function
-  const showAlert = (message, type = 'error') => {
-    setAlert({ show: true, message, type });
-  };
-
-  // Verify token
-  const verifyToken = async (token) => {
-    try {
-      const data = await getCurrentUser(token);
-      console.log('User already logged in:', data);
-      if (data.username) {
-        navigate(`/profile/${data.username}`);
-      }
-    } catch (error) {
-      console.error('Token verification error:', error);
-      clearAuth();
-    }
-  };
-
   const handleLogin = async (e) => {
     e.preventDefault();
 
@@ -132,6 +143,7 @@ const AuthPage = () => {
 
     try {
       const response = await login(loginData.email, loginData.password);
+      console.log('🔍 Login response:', response);
 
       if (response.status === 'error' && response.requiresOTP) {
         setOtpData({ email: loginData.email, otp: '', resendCooldown: 60 });
@@ -140,20 +152,28 @@ const AuthPage = () => {
         return;
       }
 
-      const loggedInUser = response?.data?.user;
-      if (!loggedInUser || !loggedInUser.username) {
+      // ✅ Handle multiple response structures
+      const loggedInUser = response?.data?.user || response?.user;
+      const token = response?.data?.token || response?.token;
+
+      console.log('🔍 Extracted user:', loggedInUser);
+      console.log('🔍 Extracted token:', token);
+
+      if (!loggedInUser?.username) {
+        console.error('❌ Invalid response structure:', response);
         throw new Error('Invalid login response from server.');
       }
 
-      storeAuth(response.data.token, loggedInUser, loginData.rememberMe);
+      storeAuth(token, loggedInUser, loginData.rememberMe);
       showAlert('Login successful! Redirecting...', 'success');
 
       setTimeout(() => {
+        console.log('✅ Navigating to:', `/profile/${loggedInUser.username}`);
         navigate(`/profile/${loggedInUser.username}`);
       }, 1000);
 
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       showAlert(error?.response?.data?.message || error.message || 'Login failed. Please check your credentials.', 'error');
     } finally {
       setLoading(false);
