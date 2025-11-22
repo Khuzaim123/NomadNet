@@ -33,21 +33,32 @@ const ProfilePage = () => {
           navigate('/');
           return;
         }
-        
+
         const response = await getCurrentUser(token);
         console.log('🔍 Current user response:', response);
-        
-        // Handle multiple possible response structures
-        const user = response?.data?.user || response?.user || response?.data || response;
-        
-        if (!user || !user._id) {
-          console.error('❌ Invalid user data:', response);
+
+        // Normalize response
+        const fetchedCurrentUser = response?.data?.user || response?.user || response?.data || response;
+        if (!fetchedCurrentUser) {
+          console.error('❌ No current user returned:', response);
           navigate('/');
           return;
         }
-        
-        console.log('✅ Current user loaded:', user.username);
-        setCurrentUser(user);
+
+        // Normalize _id
+        const normalizedUser = {
+          ...fetchedCurrentUser,
+          _id: fetchedCurrentUser._id || fetchedCurrentUser.id,
+        };
+
+        if (!normalizedUser._id) {
+          console.error('❌ Current user missing _id:', fetchedCurrentUser);
+          navigate('/');
+          return;
+        }
+
+        console.log('✅ Current user loaded:', normalizedUser.username);
+        setCurrentUser(normalizedUser);
       } catch (err) {
         console.error('❌ Failed to fetch current user:', err);
         localStorage.clear();
@@ -55,40 +66,60 @@ const ProfilePage = () => {
         navigate('/');
       }
     };
+
     fetchCurrentUser();
   }, [navigate]);
 
+  // Fetch profile user by username
   useEffect(() => {
     const fetchUser = async () => {
       if (!currentUser) {
         console.log('⏳ Waiting for current user...');
         return;
       }
-      
+
       try {
         setLoading(true);
         setError('');
-        
+
         console.log('🔍 Fetching profile for:', username);
         const response = await getUserByUsername(username);
-        console.log('🔍 getUserByUsername response:', response);
-        
-        // Handle multiple possible response structures
-        const fetchedUser = response?.data?.data?.user || response?.data?.user || response?.user || response?.data;
-        
-        if (!fetchedUser || !fetchedUser._id) {
-          throw new Error('Invalid user data received');
+        console.log('🔍 getUserByUsername raw response:', response);
+
+        // Normalize response
+        const fetchedUserRaw =
+          response?.data?.data?.user ||
+          response?.data?.user ||
+          response?.user ||
+          response?.data;
+
+        if (!fetchedUserRaw) {
+          console.error('❌ No user object returned', response);
+          setError('User data is invalid.');
+          return;
         }
-        
-        // Debug logs to check what data we're receiving
+
+        // Normalize _id
+        const fetchedUser = {
+          ...fetchedUserRaw,
+          _id: fetchedUserRaw._id || fetchedUserRaw.id,
+        };
+
+        if (!fetchedUser._id) {
+          console.error('❌ User object missing _id:', fetchedUserRaw);
+          setError('User data missing ID.');
+          return;
+        }
+
+        // Debug logs
         console.log('✅ Fetched user data:', fetchedUser);
         console.log('   - Profession:', fetchedUser.profession);
         console.log('   - Languages:', fetchedUser.languages);
         console.log('   - Links:', fetchedUser.links);
-        
+
         setUser(fetchedUser);
         setIsOwner(fetchedUser._id === currentUser._id);
-        
+
         console.log('✅ Profile loaded successfully');
       } catch (err) {
         console.error('❌ Error fetching user:', err);
@@ -100,9 +131,11 @@ const ProfilePage = () => {
         setLoading(false);
       }
     };
+
     fetchUser();
   }, [username, currentUser, navigate]);
 
+  // Modal handlers
   const handleProfileUpdate = (updatedUser) => {
     console.log('✅ Profile updated with:', updatedUser);
     setUser(updatedUser);
@@ -118,15 +151,16 @@ const ProfilePage = () => {
     console.log('❌ Closing edit modal');
     setEditModalOpen(false);
   };
-  
+
+  // Render
   if (loading) return <div className="profile-container"><Spinner /></div>;
   if (error) return <div className="profile-container error-message">{error}</div>;
   if (!user) return <div className="profile-container error-message">User not found</div>;
 
   return (
     <div className="profile-container">
-      <ProfileHeader 
-        user={user} 
+      <ProfileHeader
+        user={user}
         isOwner={isOwner}
         onEditProfile={handleEditModalOpen}
         onChangeAvatar={() => setAvatarModalOpen(true)}

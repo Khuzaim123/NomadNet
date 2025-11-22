@@ -2,7 +2,7 @@
 import api from './api';
 
 export const getUserByUsername = (username) => {
-  return api.get(`/users/username/${username}`); // ✅ match backend route
+  return api.get(`api/users/username/${username}`); // ✅ match backend route
 };
 
 // Update user profile
