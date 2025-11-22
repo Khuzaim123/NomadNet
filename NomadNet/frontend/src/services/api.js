@@ -13,13 +13,33 @@ const api = axios.create({
 
 // Add a request interceptor to include the auth token
 api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
   console.log('📤 API Request:', config.method?.toUpperCase(), config.url);
   console.log('🔑 Token:', token ? 'Present ✅' : 'Missing ❌');
   console.log('🌐 Full URL:', `${config.baseURL}${config.url}`);
+  
+  // ✅ Log request data
+  if (config.data) {
+    if (config.data instanceof FormData) {
+      console.log('📦 Request Type: FormData');
+      console.log('📋 FormData contents:');
+      for (let pair of config.data.entries()) {
+        if (pair[1] instanceof File) {
+          console.log(`  ${pair[0]}:`, `[File: ${pair[1].name}, ${pair[1].type}, ${pair[1].size} bytes]`);
+        } else {
+          console.log(`  ${pair[0]}:`, pair[1]);
+        }
+      }
+    } else {
+      console.log('📦 Request Type: JSON');
+      console.log('📋 Request Data:', JSON.stringify(config.data, null, 2));
+    }
+  }
+  
   return config;
 });
 
@@ -34,10 +54,26 @@ api.interceptors.response.use(
     console.error('❌ Error message:', error.response?.data?.message);
     console.error('❌ Full error data:', error.response?.data);
     
+    // ✅ Log detailed validation errors
+    if (error.response?.data?.errors) {
+      console.error('❌ Validation errors:', error.response.data.errors);
+    }
+    if (error.response?.data?.details) {
+      console.error('❌ Error details:', error.response.data.details);
+    }
+    if (error.response?.data?.error) {
+      console.error('❌ Error:', error.response.data.error);
+    }
+    
     if (error.response?.status === 401) {
       console.log('🚪 Unauthorized - redirecting to login');
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      
+      // Redirect to login/auth page
+      window.location.href = '/';
     }
     return Promise.reject(error);
   }

@@ -60,7 +60,7 @@ console.log('\n' + '='.repeat(60));
 console.log('🔄 LOADING ROUTES...');
 console.log('='.repeat(60) + '\n');
 
-let authRoutes, userRoutes;
+let authRoutes, userRoutes, venueRoutes, checkInRoutes;
 
 // Load Auth Routes
 try {
@@ -90,6 +90,38 @@ try {
   process.exit(1);
 }
 
+// Load Venue Routes
+try {
+  console.log('🔍 Loading venueRoutes from:', __dirname + '/src/routes/venueRoutes.js');
+  venueRoutes = require('./src/routes/venueRoutes');
+  console.log('✅ Venue routes loaded successfully\n');
+} catch (error) {
+  console.error('❌ CRITICAL: Failed to load venueRoutes');
+  console.error('   Error:', error.message);
+  console.error('   Stack:', error.stack);
+  console.error('\n💡 Troubleshooting:');
+  console.error('   1. Check if src/routes/venueRoutes.js exists');
+  console.error('   2. Check if venueController.js exists');
+  console.error('   3. Check if venueValidator.js exists');
+  process.exit(1);
+}
+
+// Load Check-in Routes
+try {
+  console.log('🔍 Loading checkInRoutes from:', __dirname + '/src/routes/checkInRoutes.js');
+  checkInRoutes = require('./src/routes/checkInRoutes');
+  console.log('✅ Check-in routes loaded successfully\n');
+} catch (error) {
+  console.error('❌ CRITICAL: Failed to load checkInRoutes');
+  console.error('   Error:', error.message);
+  console.error('   Stack:', error.stack);
+  console.error('\n💡 Troubleshooting:');
+  console.error('   1. Check if src/routes/checkInRoutes.js exists');
+  console.error('   2. Check if checkInController.js exists');
+  console.error('   3. Check if checkInValidator.js exists');
+  process.exit(1);
+}
+
 // ======================
 // Mount Routes
 // ======================
@@ -101,7 +133,13 @@ app.use('/api/auth', authRoutes);
 console.log('✅ Auth routes mounted at /api/auth');
 
 app.use('/api/users', userRoutes);
-console.log('✅ User routes mounted at /api/users\n');
+console.log('✅ User routes mounted at /api/users');
+
+app.use('/api/venues', venueRoutes);
+console.log('✅ Venue routes mounted at /api/venues');
+
+app.use('/api/checkins', checkInRoutes);
+console.log('✅ Check-in routes mounted at /api/checkins\n');
 
 // ======================
 // Health Check
@@ -117,11 +155,15 @@ app.get('/api/health', (req, res) => {
     },
     routes: {
       auth: true,
-      users: true
+      users: true,
+      venues: true,
+      checkins: true
     },
     endpoints: {
       auth: '/api/auth/test',
-      users: '/api/users/test'
+      users: '/api/users/test',
+      venues: '/api/venues/test',
+      checkins: '/api/checkins/test'
     }
   });
 });
@@ -178,7 +220,9 @@ app.use((req, res) => {
       health: '/api/health',
       routes: '/api/debug/routes',
       authTest: '/api/auth/test',
-      usersTest: '/api/users/test'
+      usersTest: '/api/users/test',
+      venuesTest: '/api/venues/test',
+      checkinsTest: '/api/checkins/test'
     }
   });
 });
@@ -212,20 +256,43 @@ mongoose.connection.once('open', async () => {
   
   try {
     const User = require('./src/models/User');
-    console.log('🔄 Checking indexes...');
+    const Venue = require('./src/models/Venue');
+    const CheckIn = require('./src/models/CheckIn');
     
+    console.log('🔄 Checking User indexes...');
     await User.collection.dropIndexes();
-    console.log('✅ Old indexes dropped');
-    
     await User.createIndexes();
-    console.log('✅ New indexes created');
+    const userIndexes = await User.collection.indexes();
+    console.log('✅ User indexes:', userIndexes.map(i => i.name).join(', '));
     
-    const indexes = await User.collection.indexes();
-    console.log('📋 Active indexes:', indexes.map(i => i.name).join(', '));
+    console.log('\n🔄 Checking Venue indexes...');
+    try {
+      await Venue.collection.dropIndexes();
+    } catch (err) {
+      if (!err.message.includes('ns not found')) {
+        console.log('⚠️  Drop venue indexes:', err.message);
+      }
+    }
+    await Venue.createIndexes();
+    const venueIndexes = await Venue.collection.indexes();
+    console.log('✅ Venue indexes:', venueIndexes.map(i => i.name).join(', '));
+    
+    console.log('\n🔄 Checking CheckIn indexes...');
+    try {
+      await CheckIn.collection.dropIndexes();
+    } catch (err) {
+      if (!err.message.includes('ns not found')) {
+        console.log('⚠️  Drop checkin indexes:', err.message);
+      }
+    }
+    await CheckIn.createIndexes();
+    const checkinIndexes = await CheckIn.collection.indexes();
+    console.log('✅ CheckIn indexes:', checkinIndexes.map(i => i.name).join(', '));
+    
     console.log('');
   } catch (error) {
     if (error.message.includes('ns not found')) {
-      console.log('ℹ️  No existing collection (will be created on first user)');
+      console.log('ℹ️  No existing collections (will be created on first document)');
     } else {
       console.error('⚠️  Index operation failed:', error.message);
     }
@@ -243,8 +310,12 @@ const server = app.listen(PORT, () => {
   console.log('='.repeat(60));
   console.log(`📡 Health Check:  http://localhost:${PORT}/api/health`);
   console.log(`🔍 Debug Routes:  http://localhost:${PORT}/api/debug/routes`);
-  console.log(`🔐 Auth Test:     http://localhost:${PORT}/api/auth/test`);
-  console.log(`👤 Users Test:    http://localhost:${PORT}/api/users/test`);
+  console.log('');
+  console.log('📍 Available Endpoints:');
+  console.log(`   🔐 Auth:      http://localhost:${PORT}/api/auth/test`);
+  console.log(`   👤 Users:     http://localhost:${PORT}/api/users/test`);
+  console.log(`   🏢 Venues:    http://localhost:${PORT}/api/venues/test`);
+  console.log(`   📍 Check-ins: http://localhost:${PORT}/api/checkins/test`);
   console.log('='.repeat(60));
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`💾 Database: ${process.env.MONGODB_URI ? 'Configured' : 'NOT CONFIGURED'}`);

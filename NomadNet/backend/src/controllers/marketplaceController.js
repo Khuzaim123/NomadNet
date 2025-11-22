@@ -1,3 +1,4 @@
+// controllers/marketplaceController.js
 const MarketplaceItem = require('../models/MarketplaceItem');
 const User = require('../models/User');
 const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require('../utils/imageUpload');
@@ -13,6 +14,7 @@ exports.createListing = async (req, res) => {
       title,
       description,
       category,
+      otherCategoryName,
       condition,
       priceType,
       price,
@@ -21,11 +23,21 @@ exports.createListing = async (req, res) => {
       deliveryOptions
     } = req.body;
 
+    console.log('📦 Creating listing:', { type, title, category, priceType, deliveryOptions });
+
     // Validate required fields
     if (!type || !title || !description || !category) {
       return res.status(400).json({
         status: 'error',
         message: 'Please provide type, title, description, and category'
+      });
+    }
+
+    // Validate otherCategoryName when category is 'other'
+    if (category === 'other' && !otherCategoryName) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please specify category name when selecting "other"'
       });
     }
 
@@ -53,7 +65,6 @@ exports.createListing = async (req, res) => {
           photos.push(result.secure_url);
         } catch (uploadError) {
           console.error('Photo upload error:', uploadError);
-          // Continue with other photos
         }
       }
     }
@@ -71,6 +82,11 @@ exports.createListing = async (req, res) => {
       priceType: priceType || 'free',
       deliveryOptions: deliveryOptions || ['pickup']
     };
+
+    // Include otherCategoryName when category is 'other'
+    if (category === 'other' && otherCategoryName) {
+      listingData.otherCategoryName = otherCategoryName;
+    }
 
     // Add optional fields
     if (condition) listingData.condition = condition;
@@ -127,10 +143,9 @@ exports.getAllListings = async (req, res) => {
       limit = 20,
       latitude,
       longitude,
-      radius = 50000 // 50km default
+      radius = 50000
     } = req.query;
 
-    // Build query
     const query = {
       isActive: true,
       available: true
@@ -140,12 +155,10 @@ exports.getAllListings = async (req, res) => {
     if (category) query.category = category;
     if (priceType) query.priceType = priceType;
 
-    // Text search
     if (search) {
       query.$text = { $search: search };
     }
 
-    // Geospatial search
     if (latitude && longitude) {
       const lat = parseFloat(latitude);
       const lng = parseFloat(longitude);
@@ -162,14 +175,12 @@ exports.getAllListings = async (req, res) => {
       };
     }
 
-    // Sorting
-    let sortOption = { createdAt: -1 }; // Default: newest first
+    let sortOption = { createdAt: -1 };
     if (sort === 'oldest') sortOption = { createdAt: 1 };
     if (sort === 'views') sortOption = { views: -1 };
     if (sort === 'price-low') sortOption = { 'price.amount': 1 };
     if (sort === 'price-high') sortOption = { 'price.amount': -1 };
 
-    // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const listings = await MarketplaceItem.find(query)
@@ -216,7 +227,6 @@ exports.getListingById = async (req, res) => {
       });
     }
 
-    // Increment view count (only if not the owner)
     if (!req.user || listing.owner._id.toString() !== req.user._id.toString()) {
       listing.views += 1;
       await listing.save();
@@ -320,7 +330,6 @@ exports.updateListing = async (req, res) => {
       });
     }
 
-    // Check ownership
     if (listing.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         status: 'error',
@@ -328,7 +337,6 @@ exports.updateListing = async (req, res) => {
       });
     }
 
-    // Fields that can be updated
     const allowedUpdates = [
       'title',
       'description',
@@ -338,7 +346,8 @@ exports.updateListing = async (req, res) => {
       'availableUntil',
       'priceType',
       'price',
-      'deliveryOptions'
+      'deliveryOptions',
+      'otherCategoryName'
     ];
 
     const updates = {};
@@ -348,7 +357,13 @@ exports.updateListing = async (req, res) => {
       }
     });
 
-    // Handle new photo uploads
+    if (req.body.category === 'other' && !req.body.otherCategoryName && !listing.otherCategoryName) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please specify category name when selecting "other"'
+      });
+    }
+
     if (req.files && req.files.length > 0) {
       const newPhotos = [];
       
@@ -414,7 +429,6 @@ exports.deletePhoto = async (req, res) => {
       });
     }
 
-    // Check ownership
     if (listing.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         status: 'error',
@@ -422,11 +436,9 @@ exports.deletePhoto = async (req, res) => {
       });
     }
 
-    // Remove from array
     listing.photos = listing.photos.filter(photo => photo !== photoUrl);
     await listing.save();
 
-    // Delete from Cloudinary
     const publicId = extractPublicId(photoUrl);
     if (publicId) {
       try {
@@ -464,7 +476,6 @@ exports.deleteListing = async (req, res) => {
       });
     }
 
-    // Check ownership
     if (listing.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         status: 'error',
@@ -472,7 +483,6 @@ exports.deleteListing = async (req, res) => {
       });
     }
 
-    // Delete all photos from Cloudinary
     if (listing.photos && listing.photos.length > 0) {
       for (const photoUrl of listing.photos) {
         const publicId = extractPublicId(photoUrl);
@@ -501,7 +511,7 @@ exports.deleteListing = async (req, res) => {
   }
 };
 
-// @desc    Request item/service (with email notification)
+// @desc    Request item/service
 // @route   POST /api/marketplace/:id/request
 // @access  Private
 exports.requestItem = async (req, res) => {
@@ -525,7 +535,6 @@ exports.requestItem = async (req, res) => {
       });
     }
 
-    // Check if user is the owner
     if (listing.owner._id.toString() === req.user._id.toString()) {
       return res.status(400).json({
         status: 'error',
@@ -533,7 +542,6 @@ exports.requestItem = async (req, res) => {
       });
     }
 
-    // Check if already requested
     const existingRequest = listing.requests.find(
       req => req.user.toString() === req.user._id.toString()
     );
@@ -545,7 +553,6 @@ exports.requestItem = async (req, res) => {
       });
     }
 
-    // Add request
     listing.requests.push({
       user: req.user._id,
       message: message || '',
@@ -554,7 +561,6 @@ exports.requestItem = async (req, res) => {
 
     await listing.save();
 
-    // ✅ Send email notification to listing owner
     try {
       await sendMarketplaceRequestEmail(
         listing.owner.email,
@@ -569,7 +575,6 @@ exports.requestItem = async (req, res) => {
       console.log(`✅ Request notification sent to: ${listing.owner.email}`);
     } catch (emailError) {
       console.error('Failed to send request email:', emailError);
-      // Don't fail the request if email fails
     }
 
     res.json({
@@ -608,7 +613,6 @@ exports.updateRequestStatus = async (req, res) => {
       });
     }
 
-    // Check ownership
     if (listing.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         status: 'error',
@@ -616,7 +620,6 @@ exports.updateRequestStatus = async (req, res) => {
       });
     }
 
-    // Find and update request
     const request = listing.requests.id(req.params.requestId);
 
     if (!request) {
@@ -628,7 +631,6 @@ exports.updateRequestStatus = async (req, res) => {
 
     request.status = status;
 
-    // If completed, mark listing as unavailable
     if (status === 'completed') {
       listing.available = false;
     }
@@ -649,7 +651,7 @@ exports.updateRequestStatus = async (req, res) => {
   }
 };
 
-// @desc    Get user's requests (items they requested from others)
+// @desc    Get user's requests
 // @route   GET /api/marketplace/my/requests
 // @access  Private
 exports.getMyRequests = async (req, res) => {
@@ -660,7 +662,6 @@ exports.getMyRequests = async (req, res) => {
     .populate('owner', 'username displayName avatar currentCity')
     .sort({ 'requests.createdAt': -1 });
 
-    // Filter to only show user's own requests
     const myRequests = listings.map(listing => {
       const userRequest = listing.requests.find(
         req => req.user.toString() === req.user._id.toString()
