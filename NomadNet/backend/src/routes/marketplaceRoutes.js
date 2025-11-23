@@ -28,10 +28,11 @@ const {
 } = require('../middleware/marketplaceValidator');
 
 // Public Routes
-router.get('/', getAllListings);
-router.get('/nearby', getNearbyListings);
-router.get('/:id', getListingById);
-router.get('/user/:userId', getListingsByUser);
+router.get('/nearby', getNearbyListings);      
+router.get('/user/:userId', getListingsByUser); 
+router.get('/:id', getListingById);              
+router.get('/', getAllListings);              
+
 
 // Protected Routes
 router.use(protect);
