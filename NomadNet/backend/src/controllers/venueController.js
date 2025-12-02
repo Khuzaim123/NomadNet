@@ -1,6 +1,7 @@
 const Venue = require('../models/Venue');
 const CheckIn = require('../models/CheckIn');
 const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require('../utils/imageUpload');
+const { emitNewVenue, emitVenueUpdate, emitVenueDelete } = require('../utils/socketEmitters');
 
 // ======================
 // 📍 VENUE MANAGEMENT
@@ -114,7 +115,7 @@ exports.createVenue = async (req, res) => {
     const photos = [];
     if (req.files && req.files.length > 0) {
       console.log(`📸 Uploading ${req.files.length} photo(s) to Cloudinary...`);
-      
+
       for (const file of req.files) {
         try {
           const publicId = `venue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -123,12 +124,12 @@ exports.createVenue = async (req, res) => {
             'nomadnet/venues',
             publicId
           );
-          
+
           photos.push({
             url: result.secure_url,
             uploadedBy: req.user._id
           });
-          
+
           console.log('✅ Photo uploaded:', result.secure_url);
         } catch (uploadError) {
           console.error('❌ Photo upload failed:', uploadError.message);
@@ -153,6 +154,11 @@ exports.createVenue = async (req, res) => {
       createdBy: req.user._id,
       source: 'user_submitted'
     });
+
+    await venue.populate('createdBy', 'username displayName avatar');
+
+    // ✅ EMIT SOCKET EVENT
+    emitNewVenue(venue);
 
     console.log('✅ Venue created:', venue._id);
     console.log('='.repeat(50) + '\n');
@@ -406,6 +412,8 @@ exports.updateVenue = async (req, res) => {
       { new: true, runValidators: true }
     ).populate('createdBy', 'username displayName avatar');
 
+    emitVenueUpdate(updatedVenue);
+
     res.json({
       status: 'success',
       message: 'Venue updated successfully',
@@ -441,6 +449,8 @@ exports.deleteVenue = async (req, res) => {
       });
     }
 
+    const location = venue.location;
+
     // Delete photos from Cloudinary
     if (venue.photos && venue.photos.length > 0) {
       for (const photo of venue.photos) {
@@ -460,6 +470,8 @@ exports.deleteVenue = async (req, res) => {
 
     await Venue.findByIdAndDelete(req.params.id);
 
+    emitVenueDelete(req.params.id, location);
+
     res.json({
       status: 'success',
       message: 'Venue and associated check-ins deleted successfully'
@@ -478,7 +490,7 @@ exports.deleteVenue = async (req, res) => {
 exports.addVenuePhoto = async (req, res) => {
   try {
     console.log('\n📸 ============ ADD VENUE PHOTO ============');
-    
+
     if (!req.file) {
       return res.status(400).json({
         status: 'error',

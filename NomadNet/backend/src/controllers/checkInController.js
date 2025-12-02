@@ -1,6 +1,7 @@
 const CheckIn = require('../models/CheckIn');
 const Venue = require('../models/Venue');
 const User = require('../models/User');
+const { emitNewCheckIn, emitCheckInUpdate, emitCheckInDelete } = require('../utils/socketEmitters');
 
 // ======================
 // 📍 CHECK-IN MANAGEMENT
@@ -75,6 +76,8 @@ exports.createCheckIn = async (req, res) => {
     if (venueId) {
       await checkIn.populate('venue', 'name category address');
     }
+
+    emitNewCheckIn(checkIn);
 
     res.status(201).json({
       status: 'success',
@@ -316,6 +319,8 @@ exports.updateCheckIn = async (req, res) => {
     await checkIn.populate('user', 'username displayName avatar');
     await checkIn.populate('venue', 'name category address');
 
+    emitCheckInUpdate(checkIn);
+
     res.json({
       status: 'success',
       message: 'Check-in updated successfully',
@@ -351,7 +356,11 @@ exports.deleteCheckIn = async (req, res) => {
       });
     }
 
+    const location = checkIn.location;
+
     await CheckIn.findByIdAndDelete(req.params.id);
+
+    emitCheckInDelete(req.params.id, location);
 
     res.json({
       status: 'success',
