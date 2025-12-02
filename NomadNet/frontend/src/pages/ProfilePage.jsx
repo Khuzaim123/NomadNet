@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getUserByUsername } from '../services/userService';
 import { getCurrentUser } from '../services/authService';
-import ProfileHeader from '../components/ProfileHeader';
 import ProfileDetails from '../components/ProfileDetails';
 import EditProfileModal from '../components/EditProfileModal';
 import AvatarUploadModal from '../components/AvatarUploadModal';
 import Spinner from '../components/Spinner';
+import { FiEdit2, FiCamera, FiSlash, FiAlertTriangle, FiMessageSquare, FiShoppingBag } from 'react-icons/fi';
+import { blockUser, reportUser } from '../services/userService';
+import { Link } from 'react-router-dom';
 
 import '../styles/profile.css';
 
@@ -35,17 +37,14 @@ const ProfilePage = () => {
         }
 
         const response = await getCurrentUser(token);
-        console.log('🔍 Current user response:', response);
-
-        // Normalize response
         const fetchedCurrentUser = response?.data?.user || response?.user || response?.data || response;
+        
         if (!fetchedCurrentUser) {
           console.error('❌ No current user returned:', response);
           navigate('/');
           return;
         }
 
-        // Normalize _id
         const normalizedUser = {
           ...fetchedCurrentUser,
           _id: fetchedCurrentUser._id || fetchedCurrentUser.id,
@@ -74,7 +73,6 @@ const ProfilePage = () => {
   useEffect(() => {
     const fetchUser = async () => {
       if (!currentUser) {
-        console.log('⏳ Waiting for current user...');
         return;
       }
 
@@ -82,11 +80,7 @@ const ProfilePage = () => {
         setLoading(true);
         setError('');
 
-        console.log('🔍 Fetching profile for:', username);
         const response = await getUserByUsername(username);
-        console.log('🔍 getUserByUsername raw response:', response);
-
-        // Normalize response
         const fetchedUserRaw =
           response?.data?.data?.user ||
           response?.data?.user ||
@@ -94,33 +88,22 @@ const ProfilePage = () => {
           response?.data;
 
         if (!fetchedUserRaw) {
-          console.error('❌ No user object returned', response);
           setError('User data is invalid.');
           return;
         }
 
-        // Normalize _id
         const fetchedUser = {
           ...fetchedUserRaw,
           _id: fetchedUserRaw._id || fetchedUserRaw.id,
         };
 
         if (!fetchedUser._id) {
-          console.error('❌ User object missing _id:', fetchedUserRaw);
           setError('User data missing ID.');
           return;
         }
 
-        // Debug logs
-        console.log('✅ Fetched user data:', fetchedUser);
-        console.log('   - Profession:', fetchedUser.profession);
-        console.log('   - Languages:', fetchedUser.languages);
-        console.log('   - Links:', fetchedUser.links);
-
         setUser(fetchedUser);
         setIsOwner(fetchedUser._id === currentUser._id);
-
-        console.log('✅ Profile loaded successfully');
       } catch (err) {
         console.error('❌ Error fetching user:', err);
         setError(err.response?.data?.message || err.message || 'Failed to fetch user profile.');
@@ -135,42 +118,96 @@ const ProfilePage = () => {
     fetchUser();
   }, [username, currentUser, navigate]);
 
-  // Modal handlers
+  const handleBlock = async () => {
+    if (window.confirm(`Are you sure you want to block ${user.displayName}?`)) {
+      try {
+        await blockUser(user._id);
+        alert('User blocked successfully.');
+      } catch (error) {
+        alert(error.response?.data?.message || 'Failed to block user.');
+      }
+    }
+  };
+
+  const handleReport = async () => {
+    const reason = prompt(`Please provide a reason for reporting ${user.displayName}:`);
+    if (reason) {
+      try {
+        await reportUser(user._id, reason);
+        alert('User reported successfully. Our team will review your report.');
+      } catch (error) {
+        alert(error.response?.data?.message || 'Failed to report user.');
+      }
+    }
+  };
+
   const handleProfileUpdate = (updatedUser) => {
-    console.log('✅ Profile updated with:', updatedUser);
     setUser(updatedUser);
     setEditModalOpen(false);
   };
 
-  const handleEditModalOpen = () => {
-    console.log('📝 Opening edit modal');
-    setEditModalOpen(true);
-  };
-
-  const handleEditModalClose = () => {
-    console.log('❌ Closing edit modal');
-    setEditModalOpen(false);
-  };
-
-  // Render
   if (loading) return <div className="profile-container"><Spinner /></div>;
   if (error) return <div className="profile-container error-message">{error}</div>;
   if (!user) return <div className="profile-container error-message">User not found</div>;
 
   return (
     <div className="profile-container">
-      <ProfileHeader
-        user={user}
-        isOwner={isOwner}
-        onEditProfile={handleEditModalOpen}
-        onChangeAvatar={() => setAvatarModalOpen(true)}
-      />
+      {/* ✅ INLINE PROFILE HEADER (replaces ProfileHeader component) */}
+      <header className="profile-header-inline">
+        <div className="avatar-container-inline">
+          <img src={user.avatar} alt={user.displayName} className="profile-avatar" />
+          {isOwner && (
+            <button 
+              className="avatar-change-btn" 
+              onClick={() => setAvatarModalOpen(true)} 
+              title="Change Avatar"
+            >
+              <FiCamera />
+            </button>
+          )}
+        </div>
+        
+        <div className="profile-info-inline">
+          <h1 className="display-name">{user.displayName}</h1>
+          <p className="username">@{user.username}</p>
+          <p className="profession">{user.profession}</p>
+          
+          {!isOwner && (
+            <Link to={`/marketplace?user=${user._id}`} className="marketplace-badge-inline">
+              <FiShoppingBag /> View Marketplace Listings
+            </Link>
+          )}
+        </div>
+        
+        <div className="profile-actions-inline">
+          {isOwner ? (
+            <button className="action-btn primary" onClick={() => setEditModalOpen(true)}>
+              <FiEdit2 /> Edit Profile
+            </button>
+          ) : (
+            <>
+              <button className="action-btn">
+                <FiMessageSquare /> Message
+              </button>
+              <button className="action-btn danger" onClick={handleBlock}>
+                <FiSlash /> Block
+              </button>
+              <button className="action-btn secondary" onClick={handleReport}>
+                <FiAlertTriangle /> Report
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Profile Details */}
       <ProfileDetails user={user} />
 
+      {/* Modals */}
       {isEditModalOpen && (
         <EditProfileModal
           user={user}
-          onClose={handleEditModalClose}
+          onClose={() => setEditModalOpen(false)}
           onProfileUpdate={handleProfileUpdate}
         />
       )}

@@ -3,6 +3,12 @@ const MarketplaceItem = require('../models/MarketplaceItem');
 const User = require('../models/User');
 const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require('../utils/imageUpload');
 const { sendMarketplaceRequestEmail } = require('../utils/emailService');
+const {
+  emitNewMarketplaceItem,
+  emitMarketplaceUpdate,
+  emitMarketplaceDelete,
+  emitMarketplaceStatusChange
+} = require('../utils/socketEmitters');
 
 // @desc    Create new marketplace listing
 // @route   POST /api/marketplace
@@ -53,7 +59,7 @@ exports.createListing = async (req, res) => {
     const photos = [];
     if (req.files && req.files.length > 0) {
       console.log(`📸 Uploading ${req.files.length} photos for listing...`);
-      
+
       for (const file of req.files) {
         try {
           const publicId = `marketplace_${req.user._id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -71,7 +77,7 @@ exports.createListing = async (req, res) => {
 
     // Get user's location for the listing
     const user = await User.findById(req.user._id);
-    
+
     const listingData = {
       owner: req.user._id,
       type,
@@ -93,7 +99,7 @@ exports.createListing = async (req, res) => {
     if (price) listingData.price = price;
     if (availableFrom) listingData.availableFrom = availableFrom;
     if (availableUntil) listingData.availableUntil = availableUntil;
-    
+
     // Add location from user profile
     if (user.currentLocation) {
       listingData.location = user.currentLocation;
@@ -104,6 +110,8 @@ exports.createListing = async (req, res) => {
     // Populate owner details
     await listing.populate('owner', 'username displayName avatar currentCity');
 
+    emitNewMarketplaceItem(listing);
+
     res.status(201).json({
       status: 'success',
       message: 'Listing created successfully',
@@ -111,7 +119,7 @@ exports.createListing = async (req, res) => {
     });
   } catch (error) {
     console.error('Create listing error:', error);
-    
+
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -238,7 +246,7 @@ exports.getListingById = async (req, res) => {
     });
   } catch (error) {
     console.error('Get listing error:', error);
-    
+
     if (error.kind === 'ObjectId') {
       return res.status(404).json({
         status: 'error',
@@ -261,7 +269,7 @@ exports.getMyListings = async (req, res) => {
     const { status = 'active' } = req.query;
 
     const query = { owner: req.user._id };
-    
+
     if (status === 'active') {
       query.isActive = true;
       query.available = true;
@@ -299,8 +307,8 @@ exports.getListingsByUser = async (req, res) => {
       isActive: true,
       available: true
     })
-    .populate('owner', 'username displayName avatar currentCity')
-    .sort({ createdAt: -1 });
+      .populate('owner', 'username displayName avatar currentCity')
+      .sort({ createdAt: -1 });
 
     res.json({
       status: 'success',
@@ -366,7 +374,7 @@ exports.updateListing = async (req, res) => {
 
     if (req.files && req.files.length > 0) {
       const newPhotos = [];
-      
+
       for (const file of req.files) {
         try {
           const publicId = `marketplace_${req.user._id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -391,6 +399,16 @@ exports.updateListing = async (req, res) => {
       updates,
       { new: true, runValidators: true }
     ).populate('owner', 'username displayName avatar currentCity');
+
+    emitMarketplaceUpdate(updatedListing);
+
+    if (updates.available !== undefined) {
+      emitMarketplaceStatusChange(
+        updatedListing._id,
+        updatedListing.available,
+        updatedListing.location
+      );
+    }
 
     res.json({
       status: 'success',
@@ -483,6 +501,8 @@ exports.deleteListing = async (req, res) => {
       });
     }
 
+    const location = listing.location;
+
     if (listing.photos && listing.photos.length > 0) {
       for (const photoUrl of listing.photos) {
         const publicId = extractPublicId(photoUrl);
@@ -497,6 +517,8 @@ exports.deleteListing = async (req, res) => {
     }
 
     await MarketplaceItem.findByIdAndDelete(req.params.id);
+
+    emitMarketplaceDelete(req.params.id, location);
 
     res.json({
       status: 'success',
@@ -659,8 +681,8 @@ exports.getMyRequests = async (req, res) => {
     const listings = await MarketplaceItem.find({
       'requests.user': req.user._id
     })
-    .populate('owner', 'username displayName avatar currentCity')
-    .sort({ 'requests.createdAt': -1 });
+      .populate('owner', 'username displayName avatar currentCity')
+      .sort({ 'requests.createdAt': -1 });
 
     const myRequests = listings.map(listing => {
       const userRequest = listing.requests.find(

@@ -38,6 +38,7 @@
   padding: 0;
 }
 
+/* ✅ FIXED: Remove centering on desktop */
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
@@ -47,6 +48,9 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* ❌ REMOVED: display: flex; place-items: center; */
+  margin: 0;
+  padding: 0;
 }
 
 button {
@@ -113,4 +117,15 @@ button:focus-visible {
 
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #818cf8, #6366f1);
+}
+
+/* ✅ App Container */
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.App {
+  width: 100%;
+  min-height: 100vh;
 }
