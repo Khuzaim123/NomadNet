@@ -67,40 +67,72 @@ exports.createOrGetConversation = async (req, res) => {
 // @desc    Get all conversations for logged-in user
 // @route   GET /api/conversations
 // @access  Private
+// @desc    Get all conversations for logged-in user
+// @route   GET /api/conversations
+// @access  Private
 exports.getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
     const { page = 1, limit = 20, archived = false } = req.query;
 
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 20;
+
     const query = {
       participants: userId,
-      archivedBy: archived === 'true' ? userId : { $ne: userId }
+      archivedBy: archived === 'true' ? userId : { $ne: userId },
     };
 
     const conversations = await Conversation.find(query)
       .populate('participants', 'name email avatar userType location')
       .populate({
         path: 'lastMessage',
-        select: 'content sender createdAt messageType isRead'
+        select: 'content sender createdAt type isRead', // note: 'type' matches your Message schema
       })
       .sort({ updatedAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .lean();
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum)
+      .lean(); // returns plain JS objects
 
-    // Add unread count for current user and other participant info
-    const formattedConversations = conversations.map(conv => {
-      const otherParticipant = conv.participants.find(
-        p => p._id.toString() !== userId
-      );
-      
-      return {
-        ...conv,
-        otherParticipant,
-        unreadCount: conv.unreadCount.get(userId) || 0,
-        isArchived: conv.archivedBy.some(id => id.toString() === userId)
-      };
-    });
+    const Status = require('../models/Status');
+
+    const formattedConversations = await Promise.all(
+      conversations.map(async (conv) => {
+        const otherParticipant = conv.participants.find(
+          (p) => p._id.toString() !== userId
+        );
+
+        // Fetch status for the other participant
+        const status = otherParticipant
+          ? await Status.findOne({ user: otherParticipant._id }).select(
+              'type message emoji expiresAt'
+            )
+          : null;
+
+        // Safely compute unreadCount from plain object
+        let unread = 0;
+        if (conv.unreadCount && typeof conv.unreadCount === 'object') {
+          // conv.unreadCount looks like { [userId]: number }
+          unread = conv.unreadCount[userId] || 0;
+        }
+
+        const isArchived = Array.isArray(conv.archivedBy)
+          ? conv.archivedBy.some((id) => id.toString() === userId)
+          : false;
+
+        return {
+          ...conv,
+          otherParticipant: otherParticipant
+            ? {
+                ...otherParticipant,
+                status: status || null,
+              }
+            : null,
+          unreadCount: unread,
+          isArchived,
+        };
+      })
+    );
 
     const total = await Conversation.countDocuments(query);
 
@@ -108,70 +140,21 @@ exports.getConversations = async (req, res) => {
       success: true,
       data: formattedConversations,
       pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
         totalConversations: total,
-        limit: limit
-      }
+        limit: limitNum,
+      },
     });
   } catch (error) {
+    console.error('getConversations error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
-      error: error.message
+      error: error.message,
     });
   }
 };
-
-// @desc    Get single conversation
-// @route   GET /api/conversations/:id
-// @access  Private
-exports.getConversation = async (req, res) => {
-  try {
-    const conversation = await Conversation.findById(req.params.id)
-      .populate('participants', 'name email avatar userType location')
-      .populate('lastMessage');
-
-    if (!conversation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Conversation not found'
-      });
-    }
-
-    // Check if user is participant
-    const isParticipant = conversation.participants.some(
-      p => p._id.toString() === req.user.id
-    );
-
-    if (!isParticipant) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
-
-    const otherParticipant = conversation.participants.find(
-      p => p._id.toString() !== req.user.id
-    );
-
-    res.status(200).json({
-      success: true,
-      data: {
-        ...conversation.toObject(),
-        otherParticipant,
-        unreadCount: conversation.unreadCount.get(req.user.id) || 0
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-};
-
 // @desc    Archive/Unarchive conversation
 // @route   PUT /api/conversations/:id/archive
 // @access  Private

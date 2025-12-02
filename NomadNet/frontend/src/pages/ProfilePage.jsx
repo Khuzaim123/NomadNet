@@ -1,7 +1,8 @@
+// src/pages/ProfilePage.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getUserByUsername } from '../services/userService';
-import { getCurrentUser } from '../services/authService';
+import { getCurrentUser, logout as logoutService } from '../services/authService'; // ⬅ import logout
 import ProfileHeader from '../components/ProfileHeader';
 import ProfileDetails from '../components/ProfileDetails';
 import EditProfileModal from '../components/EditProfileModal';
@@ -27,7 +28,8 @@ const ProfilePage = () => {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const token =
+          localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) {
           console.warn('⚠️ No token found, redirecting to login');
           navigate('/');
@@ -37,15 +39,15 @@ const ProfilePage = () => {
         const response = await getCurrentUser(token);
         console.log('🔍 Current user response:', response);
 
-        // Normalize response
-        const fetchedCurrentUser = response?.data?.user || response?.user || response?.data || response;
+        const fetchedCurrentUser =
+          response?.data?.user || response?.user || response?.data || response;
+
         if (!fetchedCurrentUser) {
           console.error('❌ No current user returned:', response);
           navigate('/');
           return;
         }
 
-        // Normalize _id
         const normalizedUser = {
           ...fetchedCurrentUser,
           _id: fetchedCurrentUser._id || fetchedCurrentUser.id,
@@ -86,7 +88,6 @@ const ProfilePage = () => {
         const response = await getUserByUsername(username);
         console.log('🔍 getUserByUsername raw response:', response);
 
-        // Normalize response
         const fetchedUserRaw =
           response?.data?.data?.user ||
           response?.data?.user ||
@@ -99,7 +100,6 @@ const ProfilePage = () => {
           return;
         }
 
-        // Normalize _id
         const fetchedUser = {
           ...fetchedUserRaw,
           _id: fetchedUserRaw._id || fetchedUserRaw.id,
@@ -111,19 +111,17 @@ const ProfilePage = () => {
           return;
         }
 
-        // Debug logs
-        console.log('✅ Fetched user data:', fetchedUser);
-        console.log('   - Profession:', fetchedUser.profession);
-        console.log('   - Languages:', fetchedUser.languages);
-        console.log('   - Links:', fetchedUser.links);
-
         setUser(fetchedUser);
         setIsOwner(fetchedUser._id === currentUser._id);
 
         console.log('✅ Profile loaded successfully');
       } catch (err) {
         console.error('❌ Error fetching user:', err);
-        setError(err.response?.data?.message || err.message || 'Failed to fetch user profile.');
+        setError(
+          err.response?.data?.message ||
+            err.message ||
+            'Failed to fetch user profile.'
+        );
         if (err.response?.status === 404) {
           setTimeout(() => navigate('/not-found'), 1000);
         }
@@ -152,19 +150,78 @@ const ProfilePage = () => {
     setEditModalOpen(false);
   };
 
+  // 🔐 Logout handler
+  const handleLogout = async () => {
+    try {
+      const token =
+        localStorage.getItem('token') || sessionStorage.getItem('token');
+
+      if (token) {
+        // Call backend logout to mark user offline / update lastActive
+        await logoutService(token);
+      }
+
+      // Clear client-side auth data regardless of server response
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('user');
+
+      navigate('/');
+    } catch (err) {
+      console.error('❌ Logout error:', err);
+      // Even if server logout fails, ensure client is logged out
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/');
+    }
+  };
+
   // Render
-  if (loading) return <div className="profile-container"><Spinner /></div>;
-  if (error) return <div className="profile-container error-message">{error}</div>;
-  if (!user) return <div className="profile-container error-message">User not found</div>;
+  if (loading)
+    return (
+      <div className="profile-container">
+        <Spinner />
+      </div>
+    );
+  if (error)
+    return <div className="profile-container error-message">{error}</div>;
+  if (!user)
+    return (
+      <div className="profile-container error-message">User not found</div>
+    );
 
   return (
     <div className="profile-container">
-      <ProfileHeader
-        user={user}
-        isOwner={isOwner}
-        onEditProfile={handleEditModalOpen}
-        onChangeAvatar={() => setAvatarModalOpen(true)}
-      />
+      {/* Header row: ProfileHeader + Logout button */}
+      <div className="profile-header-row">
+        <div className="profile-header-main">
+          <ProfileHeader
+            user={user}
+            isOwner={isOwner}
+            onEditProfile={handleEditModalOpen}
+            onChangeAvatar={() => setAvatarModalOpen(true)}
+          />
+        </div>
+
+        {isOwner && (
+          <button className="profile-logout-btn" onClick={handleLogout}>
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+              className="profile-logout-icon"
+            >
+              <path
+                fill="currentColor"
+                d="M16 13v-2H7V8l-4 4 4 4v-3h9zm2-10H8a2 2 0 0 0-2 2v3h2V5h10v14H8v-3H6v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"
+              />
+            </svg>
+            <span>Logout</span>
+          </button>
+        )}
+      </div>
+
       <ProfileDetails user={user} />
 
       {isEditModalOpen && (

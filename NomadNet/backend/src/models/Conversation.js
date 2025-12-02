@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose'); //orm for mongodb
 
 const ConversationSchema = new mongoose.Schema({
   participants: [{
@@ -39,4 +39,4 @@ ConversationSchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('Conversation', ConversationSchema);
+module.exports = mongoose.models.Conversation || mongoose.model('Conversation', ConversationSchema);

@@ -18,7 +18,7 @@ export const getAllListings = async (filters = {}) => {
     if (filters.page) params.append('page', filters.page);
     if (filters.limit) params.append('limit', filters.limit);
     
-    const response = await api.get(`/api/marketplace?${params.toString()}`);
+    const response = await api.get(`/marketplace?${params.toString()}`);
     return response.data;
   } catch (error) {
     console.error('❌ Get listings error:', error);
@@ -38,7 +38,7 @@ export const getNearbyListings = async (longitude, latitude, radius = 50000, typ
     if (type) params.append('type', type);
     if (category) params.append('category', category);
     
-    const response = await api.get(`/api/marketplace/nearby?${params.toString()}`);
+    const response = await api.get(`/marketplace/nearby?${params.toString()}`);
     return response.data;
   } catch (error) {
     console.error('❌ Get nearby listings error:', error);
@@ -49,7 +49,7 @@ export const getNearbyListings = async (longitude, latitude, radius = 50000, typ
 // Get single listing by ID
 export const getListingById = async (id) => {
   try {
-    const response = await api.get(`/api/marketplace/${id}`);
+    const response = await api.get(`/marketplace/${id}`);
     return response.data;
   } catch (error) {
     console.error('❌ Get listing by ID error:', error);
@@ -60,7 +60,7 @@ export const getListingById = async (id) => {
 // Get user's own listings
 export const getMyListings = async (status = 'active') => {
   try {
-    const response = await api.get(`/api/marketplace/my/listings?status=${status}`);
+    const response = await api.get(`/marketplace/my/listings?status=${status}`);
     return response.data;
   } catch (error) {
     console.error('❌ Get my listings error:', error);
@@ -71,7 +71,7 @@ export const getMyListings = async (status = 'active') => {
 // Get listings by user ID
 export const getListingsByUser = async (userId) => {
   try {
-    const response = await api.get(`/api/marketplace/user/${userId}`);
+    const response = await api.get(`/marketplace/user/${userId}`);
     return response.data;
   } catch (error) {
     console.error('❌ Get user listings error:', error);
@@ -121,13 +121,13 @@ export const createListing = async (listingData) => {
         formData.append('photos', photo);
       });
       
-      const response = await api.post('/api/marketplace', formData, {
+      const response = await api.post('/marketplace', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
     } else {
       // No photos, send JSON
-      const response = await api.post('/api/marketplace', listingData);
+      const response = await api.post('/marketplace', listingData);
       return response.data;
     }
   } catch (error) {
@@ -163,12 +163,12 @@ export const updateListing = async (id, updateData) => {
         }
       });
       
-      const response = await api.put(`/api/marketplace/${id}`, formData, {
+      const response = await api.put(`/marketplace/${id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
     } else {
-      const response = await api.put(`/api/marketplace/${id}`, updateData);
+      const response = await api.put(`/marketplace/${id}`, updateData);
       return response.data;
     }
   } catch (error) {
@@ -180,7 +180,7 @@ export const updateListing = async (id, updateData) => {
 // Delete photo from listing
 export const deletePhoto = async (id, photoUrl) => {
   try {
-    const response = await api.delete(`/api/marketplace/${id}/photos`, {
+    const response = await api.delete(`/marketplace/${id}/photos`, {
       data: { photoUrl }
     });
     return response.data;
@@ -193,7 +193,7 @@ export const deletePhoto = async (id, photoUrl) => {
 // Delete listing
 export const deleteListing = async (id) => {
   try {
-    const response = await api.delete(`/api/marketplace/${id}`);
+    const response = await api.delete(`/marketplace/${id}`);
     return response.data;
   } catch (error) {
     console.error('❌ Delete listing error:', error);
@@ -208,7 +208,7 @@ export const deleteListing = async (id) => {
 // Request item/service
 export const requestItem = async (id, message) => {
   try {
-    const response = await api.post(`/api/marketplace/${id}/request`, { message });
+    const response = await api.post(`/marketplace/${id}/request`, { message });
     return response.data;
   } catch (error) {
     console.error('❌ Request item error:', error);
@@ -219,7 +219,7 @@ export const requestItem = async (id, message) => {
 // Update request status
 export const updateRequestStatus = async (listingId, requestId, status) => {
   try {
-    const response = await api.patch(`/api/marketplace/${listingId}/request/${requestId}`, { status });
+    const response = await api.patch(`/marketplace/${listingId}/request/${requestId}`, { status });
     return response.data;
   } catch (error) {
     console.error('❌ Update request status error:', error);
@@ -230,7 +230,7 @@ export const updateRequestStatus = async (listingId, requestId, status) => {
 // Get user's requests
 export const getMyRequests = async () => {
   try {
-    const response = await api.get('/api/marketplace/my/requests');
+    const response = await api.get('/marketplace/my/requests');
     return response.data;
   } catch (error) {
     console.error('❌ Get my requests error:', error);

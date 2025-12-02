@@ -1,5 +1,5 @@
 const Message = require('../models/Message');
-const Conversation = require('../models/conversation');
+const Conversation = require('../models/Conversation');
 const User = require('../models/User');
 
 // @desc    Send a message
@@ -45,14 +45,14 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-    // Create message
+      // Create message – map messageType → type
     const message = await Message.create({
       conversation: conversation._id,
       sender: senderId,
       receiver: receiverId,
       content,
-      messageType,
-      attachments: attachments || []
+      type: messageType,             
+      attachments: attachments || [],
     });
 
     // Update conversation
