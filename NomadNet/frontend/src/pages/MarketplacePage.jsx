@@ -60,7 +60,7 @@ const MarketplacePage = () => {
         params[key] = filters[key];
       }
     });
-    setSearchParams(params);
+    setSearchParams(params, { replace: true }); 
   }, [filters, setSearchParams]);
 
   const handleFilterChange = (key, value) => {

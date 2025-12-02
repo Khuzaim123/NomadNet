@@ -1,12 +1,13 @@
 // src/pages/ListingDetailsPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  getListingById, 
-  requestItem, 
-  deleteListing 
+import {
+  getListingById,
+  requestItem,
+  deleteListing,
 } from '../services/marketplaceService';
-import { getToken, getUser } from '../utils/authUtils';
+import chatService from '../services/chatService';
+import { getToken, getUser, isAuthenticated } from '../utils/authUtils';
 import Spinner from '../components/Spinner';
 import '../styles/marketplace.css';
 
@@ -21,11 +22,14 @@ const ListingDetailsPage = () => {
   const [requestMessage, setRequestMessage] = useState('');
   const [requestLoading, setRequestLoading] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
+  const [messageLoading, setMessageLoading] = useState(false);
 
-  const currentUserId = getUser()?.id || getUser()?._id || null;
+  const currentUser = getUser();
+  const currentUserId = currentUser?.id || currentUser?._id || null;
 
   useEffect(() => {
     fetchListingDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchListingDetails = async () => {
@@ -33,7 +37,16 @@ const ListingDetailsPage = () => {
       setLoading(true);
       setError(null);
       const data = await getListingById(id);
-      setListing(data.data.listing);
+
+      console.log('Listing API Response:', data);
+
+      const listingData =
+        data?.data?.listing || data?.listing || data?.data || data;
+
+      console.log('Parsed listing data:', listingData);
+      console.log('Listing owner:', listingData?.owner);
+
+      setListing(listingData);
     } catch (err) {
       console.error('Error fetching listing:', err);
       setError(err.response?.data?.message || 'Failed to load listing');
@@ -42,11 +55,128 @@ const ListingDetailsPage = () => {
     }
   };
 
+  // Get owner ID safely
+  const getOwnerId = () => {
+    if (!listing) return null;
+
+    if (listing.owner?._id) return listing.owner._id;
+    if (listing.owner?.id) return listing.owner.id;
+    if (typeof listing.owner === 'string') return listing.owner;
+    if (listing.ownerId) return listing.ownerId;
+    if (listing.userId) return listing.userId;
+    if (listing.user?._id) return listing.user._id;
+    if (listing.user?.id) return listing.user.id;
+    if (typeof listing.user === 'string') return listing.user;
+    if (listing.seller?._id) return listing.seller._id;
+    if (listing.seller?.id) return listing.seller.id;
+    if (typeof listing.seller === 'string') return listing.seller;
+
+    return null;
+  };
+
+  // Get owner object safely
+  const getOwner = () => {
+    if (!listing) return null;
+
+    if (
+      listing.owner &&
+      typeof listing.owner === 'object' &&
+      (listing.owner._id || listing.owner.id)
+    ) {
+      return listing.owner;
+    }
+
+    if (listing.user && typeof listing.user === 'object') {
+      return listing.user;
+    }
+
+    if (listing.seller && typeof listing.seller === 'object') {
+      return listing.seller;
+    }
+
+    const ownerId = getOwnerId();
+    if (ownerId) {
+      return { _id: ownerId, displayName: 'Seller', username: 'seller' };
+    }
+
+    return null;
+  };
+
+  const handleMessageSeller = async () => {
+    if (!isAuthenticated()) {
+      navigate('/login', { state: { from: `/marketplace/${id}` } });
+      return;
+    }
+
+    const ownerId = getOwnerId();
+    const owner = getOwner();
+
+    console.log('Listing object:', listing);
+    console.log('Owner ID:', ownerId);
+    console.log('Owner object:', owner);
+
+    if (!ownerId) {
+      console.error('Could not find owner ID. Listing structure:', listing);
+      alert('Unable to contact seller. Owner information is missing.');
+      return;
+    }
+
+    if (
+      ownerId === currentUserId ||
+      ownerId?.toString() === currentUserId?.toString()
+    ) {
+      alert('You cannot message yourself.');
+      return;
+    }
+
+    try {
+      setMessageLoading(true);
+
+      const response = await chatService.createOrGetConversation(ownerId);
+      console.log('Conversation response:', response);
+
+      const conversation =
+        response?.data?.conversation ||
+        response?.conversation ||
+        response?.data ||
+        response;
+
+      if (!conversation?._id && !conversation?.id) {
+        throw new Error('Failed to create conversation - invalid response');
+      }
+
+      const conversationId = conversation._id || conversation.id;
+
+      navigate('/chat', {
+        state: {
+          conversationId,
+          otherUser: owner,
+          listingContext: {
+            id: listing._id || listing.id,
+            title: listing.title,
+            type: listing.type,
+            price:
+              listing.priceType === 'free'
+                ? 'FREE'
+                : listing.priceType === 'barter'
+                ? 'Barter'
+                : `$${listing.price?.amount || listing.price || 0}`,
+          },
+        },
+      });
+    } catch (err) {
+      console.error('Error creating conversation:', err);
+      alert(err.message || 'Failed to start conversation. Please try again.');
+    } finally {
+      setMessageLoading(false);
+    }
+  };
+
   const handleRequestItem = async (e) => {
     e.preventDefault();
-    
+
     if (!getToken()) {
-      navigate('/');
+      navigate('/login');
       return;
     }
 
@@ -56,10 +186,9 @@ const ListingDetailsPage = () => {
       setRequestSuccess(true);
       setShowRequestModal(false);
       setRequestMessage('');
-      
-      // Refresh listing to show updated request
+
       fetchListingDetails();
-      
+
       setTimeout(() => setRequestSuccess(false), 3000);
     } catch (err) {
       console.error('Request error:', err);
@@ -87,7 +216,10 @@ const ListingDetailsPage = () => {
     if (!listing) return '';
     if (listing.priceType === 'free') return 'FREE';
     if (listing.priceType === 'barter') return 'Open to Barter';
-    return `$${listing.price?.amount || 0} ${listing.price?.currency || 'USD'}`;
+
+    const amount = listing.price?.amount || listing.price || 0;
+    const currency = listing.price?.currency || 'USD';
+    return `$${amount} ${currency}`;
   };
 
   const getCategoryLabel = () => {
@@ -95,11 +227,28 @@ const ListingDetailsPage = () => {
     if (listing.category === 'other' && listing.otherCategoryName) {
       return listing.otherCategoryName;
     }
-    return listing.category?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return (
+      listing.category
+        ?.replace(/_/g, ' ')
+        .replace(/\b\w/g, (l) => l.toUpperCase()) || ''
+    );
   };
 
-  const isOwner = currentUserId && listing?.owner?._id === currentUserId;
-  const hasRequested = listing?.requests?.some(req => req.user._id === currentUserId);
+  const owner = getOwner();
+  const ownerId = getOwnerId();
+  const isOwner =
+    currentUserId &&
+    ownerId &&
+    (ownerId === currentUserId ||
+      ownerId?.toString() === currentUserId?.toString());
+
+  const hasRequested = listing?.requests?.some((req) => {
+    const reqUserId = req.user?._id || req.user?.id || req.user;
+    return (
+      reqUserId === currentUserId ||
+      reqUserId?.toString() === currentUserId?.toString()
+    );
+  });
 
   if (loading) {
     return (
@@ -118,7 +267,9 @@ const ListingDetailsPage = () => {
           <div className="empty-state">
             <div className="empty-state-icon">⚠️</div>
             <h2 className="empty-state-title">Listing Not Found</h2>
-            <p className="empty-state-text">{error || 'This listing does not exist'}</p>
+            <p className="empty-state-text">
+              {error || 'This listing does not exist'}
+            </p>
             <Link to="/marketplace" className="create-listing-btn">
               Back to Marketplace
             </Link>
@@ -131,7 +282,6 @@ const ListingDetailsPage = () => {
   return (
     <div className="marketplace-page">
       <div className="marketplace-container">
-        {/* Back Button */}
         <Link to="/marketplace" className="back-link">
           ← Back to Marketplace
         </Link>
@@ -148,8 +298,8 @@ const ListingDetailsPage = () => {
             {listing.photos && listing.photos.length > 0 ? (
               <>
                 <div className="main-image">
-                  <img 
-                    src={listing.photos[currentImageIndex]} 
+                  <img
+                    src={listing.photos[currentImageIndex]}
                     alt={listing.title}
                   />
                 </div>
@@ -160,7 +310,9 @@ const ListingDetailsPage = () => {
                         key={index}
                         src={photo}
                         alt={`${listing.title} ${index + 1}`}
-                        className={`thumbnail ${index === currentImageIndex ? 'active' : ''}`}
+                        className={`thumbnail ${
+                          index === currentImageIndex ? 'active' : ''
+                        }`}
                         onClick={() => setCurrentImageIndex(index)}
                       />
                     ))}
@@ -170,7 +322,11 @@ const ListingDetailsPage = () => {
             ) : (
               <div className="no-image-placeholder">
                 <span className="placeholder-icon">
-                  {listing.type === 'item' ? '📦' : listing.type === 'service' ? '🛠️' : '🎓'}
+                  {listing.type === 'item'
+                    ? '📦'
+                    : listing.type === 'service'
+                    ? '🛠️'
+                    : '🎓'}
                 </span>
                 <p>No images available</p>
               </div>
@@ -182,15 +338,15 @@ const ListingDetailsPage = () => {
             <div className="listing-header-section">
               <div className="listing-badges">
                 <span className="type-badge">
-                  {listing.type?.charAt(0).toUpperCase() + listing.type?.slice(1)}
+                  {listing.type
+                    ?.charAt(0)
+                    .toUpperCase() + listing.type?.slice(1)}
                 </span>
-                <span className="category-badge">
-                  {getCategoryLabel()}
-                </span>
+                <span className="category-badge">{getCategoryLabel()}</span>
               </div>
 
               <h1 className="details-title">{listing.title}</h1>
-              
+
               <div className="price-section">
                 <span className="price-label">Price:</span>
                 <span className="price-value">{formatPrice()}</span>
@@ -200,24 +356,24 @@ const ListingDetailsPage = () => {
                 <div className="condition-section">
                   <span className="condition-label">Condition:</span>
                   <span className="condition-value">
-                    {listing.condition.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    {listing.condition
+                      .replace(/_/g, ' ')
+                      .replace(/\b\w/g, (l) => l.toUpperCase())}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Description */}
             <div className="description-section">
               <h3 className="section-title">Description</h3>
               <p className="description-text">{listing.description}</p>
             </div>
 
-            {/* Delivery Options */}
             {listing.deliveryOptions && listing.deliveryOptions.length > 0 && (
               <div className="delivery-section">
                 <h3 className="section-title">Delivery Options</h3>
                 <div className="delivery-tags">
-                  {listing.deliveryOptions.map(option => (
+                  {listing.deliveryOptions.map((option) => (
                     <span key={option} className="delivery-tag">
                       {option.charAt(0).toUpperCase() + option.slice(1)}
                     </span>
@@ -227,28 +383,48 @@ const ListingDetailsPage = () => {
             )}
 
             {/* Owner Info */}
-            <div className="owner-section">
-              <h3 className="section-title">Listed by</h3>
-              <Link 
-                to={`/profile/${listing.owner?.username}`} 
-                className="owner-card"
-              >
-                <img 
-                  src={listing.owner?.avatar || 'https://ui-avatars.com/api/?name=User'} 
-                  alt={listing.owner?.displayName}
-                  className="owner-avatar-large"
-                />
-                <div className="owner-info">
-                  <h4 className="owner-name">{listing.owner?.displayName}</h4>
-                  <p className="owner-username">@{listing.owner?.username}</p>
-                  {listing.owner?.currentCity && (
-                    <p className="owner-location">📍 {listing.owner.currentCity}</p>
-                  )}
-                </div>
-              </Link>
-            </div>
+            {owner && (
+              <div className="owner-section">
+                <h3 className="section-title">Listed by</h3>
+                <Link
+                  to={owner.username ? `/profile/${owner.username}` : '#'}
+                  className="owner-card"
+                  onClick={(e) =>
+                    !owner.username && e.preventDefault()
+                  }
+                >
+                  <img
+                    src={
+                      owner.avatar ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        owner.displayName || owner.username || 'Seller'
+                      )}&background=6366f1&color=fff`
+                    }
+                    alt={owner.displayName || owner.username || 'Seller'}
+                    className="owner-avatar-large"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        'https://ui-avatars.com/api/?name=S&background=6366f1&color=fff';
+                    }}
+                  />
+                  <div className="owner-info">
+                    <h4 className="owner-name">
+                      {owner.displayName || owner.username || 'Seller'}
+                    </h4>
+                    {owner.username && (
+                      <p className="owner-username">@{owner.username}</p>
+                    )}
+                    {owner.currentCity && (
+                      <p className="owner-location">
+                        📍 {owner.currentCity}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              </div>
+            )}
 
-            {/* Stats */}
             <div className="stats-section">
               <div className="stat-item">
                 <span className="stat-icon">👁️</span>
@@ -257,7 +433,9 @@ const ListingDetailsPage = () => {
               </div>
               <div className="stat-item">
                 <span className="stat-icon">💬</span>
-                <span className="stat-value">{listing.requests?.length || 0}</span>
+                <span className="stat-value">
+                  {listing.requests?.length || 0}
+                </span>
                 <span className="stat-label">Requests</span>
               </div>
             </div>
@@ -266,39 +444,80 @@ const ListingDetailsPage = () => {
             <div className="action-buttons">
               {isOwner ? (
                 <>
-                  {/* ✅ ADDED: Edit Button */}
-                  <Link 
-                    to={`/marketplace/edit/${listing._id}`} 
+                  <Link
+                    to={`/marketplace/edit/${listing._id || listing.id}`}
                     className="primary-action-btn"
                   >
                     ✏️ Edit Listing
                   </Link>
-                  <Link 
-                    to={`/marketplace/my-listings`} 
+
+                  <Link
+                    to="/marketplace/my-listings"
                     className="secondary-action-btn"
                   >
                     📋 View All My Listings
                   </Link>
-                  <button 
+
+                  {/* View Chats for owner */}
+                  <Link to="/chat" className="secondary-action-btn">
+                    💬 View Chats
+                  </Link>
+
+                  <button
                     className="danger-action-btn"
                     onClick={handleDeleteListing}
                   >
                     🗑️ Delete Listing
                   </button>
                 </>
-              ) : listing.available ? (
-                hasRequested ? (
-                  <div className="already-requested">
-                    ✅ You've already requested this listing
-                  </div>
-                ) : (
-                  <button 
-                    className="primary-action-btn"
-                    onClick={() => setShowRequestModal(true)}
-                  >
-                    Request This {listing.type}
-                  </button>
-                )
+              ) : listing.available !== false ? (
+                <>
+                  {hasRequested ? (
+                    <div className="already-requested">
+                      ✅ You've already requested this listing
+                    </div>
+                  ) : (
+                    <button
+                      className="primary-action-btn"
+                      onClick={() => setShowRequestModal(true)}
+                    >
+                      📩 Request This {listing.type || 'Item'}
+                    </button>
+                  )}
+
+                  {isAuthenticated() && ownerId && (
+                    <button
+                      className="secondary-action-btn message-seller-btn"
+                      onClick={handleMessageSeller}
+                      disabled={messageLoading}
+                    >
+                      {messageLoading ? (
+                        <>
+                          <span className="btn-spinner"></span>
+                          Starting chat...
+                        </>
+                      ) : (
+                        <>💬 Message Seller</>
+                      )}
+                    </button>
+                  )}
+
+                  {isAuthenticated() && !ownerId && (
+                    <div className="info-message">
+                      ℹ️ Seller contact information is not available
+                    </div>
+                  )}
+
+                  {!isAuthenticated() && (
+                    <Link
+                      to="/login"
+                      state={{ from: `/marketplace/${id}` }}
+                      className="secondary-action-btn"
+                    >
+                      🔐 Login to Message Seller
+                    </Link>
+                  )}
+                </>
               ) : (
                 <div className="unavailable-badge">
                   ❌ No Longer Available
@@ -310,11 +529,17 @@ const ListingDetailsPage = () => {
 
         {/* Request Modal */}
         {showRequestModal && (
-          <div className="modal-overlay" onClick={() => setShowRequestModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-overlay"
+            onClick={() => setShowRequestModal(false)}
+          >
+            <div
+              className="modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="modal-header">
                 <h2>Request: {listing.title}</h2>
-                <button 
+                <button
                   className="modal-close"
                   onClick={() => setShowRequestModal(false)}
                 >
@@ -333,7 +558,9 @@ const ListingDetailsPage = () => {
                     rows={5}
                     maxLength={500}
                   />
-                  <span className="char-count">{requestMessage.length}/500</span>
+                  <span className="char-count">
+                    {requestMessage.length}/500
+                  </span>
                 </div>
 
                 <div className="modal-actions">
