@@ -299,4 +299,4 @@ UserSchema.methods.clearOTP = function() {
   this.otpAttempts = 0;
 };
 
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.models.User || mongoose.model('User', UserSchema);

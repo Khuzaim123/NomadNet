@@ -292,4 +292,5 @@ MarketplaceItemSchema.methods.incrementViews = async function() {
 // ======================
 // 📤 Export Model
 // ======================
-module.exports = mongoose.model('MarketplaceItem', MarketplaceItemSchema);
+
+module.exports = mongoose.models.MarketplaceItem || mongoose.model('MarketplaceItem', MarketplaceItemSchema);

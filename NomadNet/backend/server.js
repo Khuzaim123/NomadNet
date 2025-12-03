@@ -1,207 +1,149 @@
-// Minimal, clean, production-ready Express server with Socket.IO
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import http from "http";
+import { Server } from "socket.io";
+import mongoose from "mongoose";
 
-const express = require('express');
-const dotenv = require('dotenv');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const morgan = require('morgan');
-const helmet = require('helmet');
-const http = require('http'); // ✅ ADD THIS
-const connectDB = require('./src/config/database');
+import {
+  CORS_OPTIONS,
+  MAX_JSON_SIZE,
+} from "./src/constants/config.js";
 
-// Load env
-dotenv.config();
-connectDB();
+import { requestLogger } from "./src/middlewares/logging.js";
+import { errorHandler } from "./src/middlewares/error.js";
 
+import registerRoutes from "./src/routes/index.js";
+import cleanupJob from "./src/jobs/cleanupJob.js";
+
+import socketHandlers from "./src/config/socket.js";
+
+// ---------------------------------------------------------------------
+// INITIAL SETUP
+// ---------------------------------------------------------------------
 const app = express();
-
-// ✅ CREATE HTTP SERVER (required for Socket.IO)
 const server = http.createServer(app);
 
-// Security
-app.use(helmet());
-
-// CORS
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    process.env.CLIENT_URL
-  ].filter(Boolean),
-  credentials: true
-}));
-
-// Body parsing + logging
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(morgan('dev'));
-
-// ======================
-// 🔥 ROUTES
-// ======================
-app.use('/api/auth', require('./src/routes/authRoutes'));
-app.use('/api/users', require('./src/routes/userRoutes'));
-app.use('/api/marketplace', require('./src/routes/marketplaceRoutes'));
-app.use('/api/venues', require('./src/routes/venueRoutes'));
-app.use('/api/checkins', require('./src/routes/checkInRoutes'));
-
-// ✅ MAP ROUTES (NEW)
-app.use('/api/map', require('./src/routes/mapRoutes'));
-
-// ======================
-// 🏥 HEALTH CHECK
-// ======================
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    socketIO: 'active', // ✅ ADD THIS
-    routes: {
-      auth: true,
-      users: true,
-      marketplace: true,
-      venues: true,
-      checkins: true,
-      map: true // ✅ ADD THIS
-    },
-    endpoints: {
-      auth: '/api/auth',
-      users: '/api/users',
-      marketplace: '/api/marketplace',
-      venues: '/api/venues/test',
-      checkins: '/api/checkins/test',
-      map: '/api/map/test' // ✅ ADD THIS
-    }
-  });
+const io = new Server(server, {
+  cors: {
+    origin: CORS_OPTIONS.origin || "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true,
+  },
 });
 
-// ======================
-// 🔍 DEBUG: List All Routes
-// ======================
-app.get('/api/debug/routes', (req, res) => {
-  const routes = [];
-  
-  app._router.stack.forEach((middleware) => {
-    if (middleware.route) {
-      routes.push({
-        path: middleware.route.path,
-        methods: Object.keys(middleware.route.methods)
-      });
-    } else if (middleware.name === 'router') {
-      middleware.handle.stack.forEach((handler) => {
-        if (handler.route) {
-          const path = middleware.regexp.source
-            .replace('\\/?', '')
-            .replace('(?=\\/|$)', '')
-            .replace(/\\\//g, '/')
-            .replace('^', '');
-          
-          routes.push({
-            path: path + handler.route.path,
-            methods: Object.keys(handler.route.methods)
-          });
-        }
-      });
-    }
-  });
-
-  res.json({
-    status: 'success',
-    totalRoutes: routes.length,
-    routes: routes
-  });
-});
-
-// ======================
-// 🚫 404 HANDLER
-// ======================
-app.use((req, res) => {
-  res.status(404).json({ 
-    error: 'Route not found',
-    path: req.path,
-    availableEndpoints: {
-      health: '/api/health',
-      routes: '/api/debug/routes',
-      auth: '/api/auth',
-      users: '/api/users',
-      marketplace: '/api/marketplace',
-      venues: '/api/venues/test',
-      checkins: '/api/checkins/test',
-      map: '/api/map/test' // ✅ ADD THIS
-    }
-  });
-});
-
-// ======================
-// ⚠️ ERROR HANDLER
-// ======================
-app.use((err, req, res, next) => {
-  console.error('Error:', err.message);
-  const status = err.message === 'Not allowed by CORS' ? 403 : 500;
-  res.status(status).json({ 
-    error: err.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
-});
-
-// ======================
-// 🧹 START CHECK-IN CLEANUP JOB
-// ======================
-const { startCleanupJob } = require('./src/utils/checkInCleanup');
-startCleanupJob();
-
-// ======================
-// 🔌 INITIALIZE SOCKET.IO
-// ======================
-const { initializeSocket } = require('./src/config/socket');
-initializeSocket(server);
-
-// ======================
-// 🚀 START SERVER
-// ======================
-const PORT = process.env.PORT || 39300;
-
-server.listen(PORT, () => {
-  console.log('\n' + '='.repeat(60));
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log('='.repeat(60));
-  console.log('📍 Available Routes:');
-  console.log(`   🔐 Auth:        http://localhost:${PORT}/api/auth`);
-  console.log(`   👤 Users:       http://localhost:${PORT}/api/users`);
-  console.log(`   🛒 Marketplace: http://localhost:${PORT}/api/marketplace`);
-  console.log(`   🏢 Venues:      http://localhost:${PORT}/api/venues/test`);
-  console.log(`   📍 Check-ins:   http://localhost:${PORT}/api/checkins/test`);
-  console.log(`   🗺️  Map:        http://localhost:${PORT}/api/map/test`);
-  console.log('='.repeat(60));
-  console.log(`🏥 Health:       http://localhost:${PORT}/api/health`);
-  console.log(`🔍 Debug Routes: http://localhost:${PORT}/api/debug/routes`);
-  console.log('='.repeat(60));
-  console.log('🔌 Socket.IO:    Ready for real-time updates');
-  console.log('🧹 Cleanup Job:  Running (every 5 minutes)');
-  console.log('='.repeat(60) + '\n');
-});
-
-// ======================
-// 🛑 Graceful Shutdown
-// ======================
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    console.log('✅ Server closed');
-    mongoose.connection.close(false, () => {
-      console.log('✅ MongoDB connection closed');
-      process.exit(0);
-    });
-  });
-});
-
-process.on('unhandledRejection', (err) => {
-  console.error('❌ UNHANDLED REJECTION! Shutting down...');
-  console.error(err.name, err.message);
-  server.close(() => {
+// ---------------------------------------------------------------------
+// DATABASE
+// ---------------------------------------------------------------------
+const MONGO_URI = process.env.MONGO_URI;
+mongoose
+  .connect(MONGO_URI)
+  .then(() => console.log("MongoDB Connected"))
+  .catch((err) => {
+    console.error("MongoDB ERROR:", err);
     process.exit(1);
   });
+
+// ---------------------------------------------------------------------
+// MIDDLEWARE
+// ---------------------------------------------------------------------
+app.use(helmet());
+app.use(cors(CORS_OPTIONS));
+
+app.use(express.json({ limit: MAX_JSON_SIZE }));
+app.use(express.urlencoded({ extended: true }));
+
+app.use(morgan("dev"));
+app.use(requestLogger);
+
+// ---------------------------------------------------------------------
+// HEALTH + DEBUG ROUTES
+// ---------------------------------------------------------------------
+app.get("/health", (req, res) => {
+  res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
-module.exports = app;
+app.get("/debug/request-info", (req, res) => {
+  res.json({
+    method: req.method,
+    origin: req.headers.origin,
+    path: req.path,
+    body: req.body,
+    query: req.query,
+  });
+});
+
+// ---------------------------------------------------------------------
+// ROUTES (ALL ROUTES LOADED FROM ROUTE INDEX)
+// ---------------------------------------------------------------------
+registerRoutes(app);
+
+// ---------------------------------------------------------------------
+// SOCKET.IO — COMBINED VERSION
+// Includes: join rooms, messages, typing, online status, workspace chat
+// ---------------------------------------------------------------------
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  // Standard socket handlers (from socket.js)
+  socketHandlers(io, socket);
+
+  // Chat join room
+  socket.on("join_chat", ({ conversationId }) => {
+    if (!conversationId) return;
+    socket.join(conversationId);
+    console.log(`User joined room: ${conversationId}`);
+  });
+
+  // Chat message send
+  socket.on("send_message", (data) => {
+    const { conversationId, message } = data;
+    if (!conversationId || !message) return;
+
+    console.log("Message sent:", data);
+    io.to(conversationId).emit("message_received", data);
+  });
+
+  // Typing indicator
+  socket.on("typing", ({ conversationId, userId }) => {
+    io.to(conversationId).emit("typing", { userId });
+  });
+
+  // Stop typing
+  socket.on("stop_typing", ({ conversationId, userId }) => {
+    io.to(conversationId).emit("stop_typing", { userId });
+  });
+
+  // Workspace status updates
+  socket.on("workspace_status", (data) => {
+    io.emit("workspace_status_update", data);
+  });
+
+  // Disconnect
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
+});
+
+// ---------------------------------------------------------------------
+// ERROR HANDLER
+// ---------------------------------------------------------------------
+app.use(errorHandler);
+
+// ---------------------------------------------------------------------
+// CRON JOBS
+// ---------------------------------------------------------------------
+cleanupJob();
+
+// ---------------------------------------------------------------------
+// START SERVER
+// ---------------------------------------------------------------------
+const PORT = process.env.PORT || 5000;
+
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
+
+export default app;

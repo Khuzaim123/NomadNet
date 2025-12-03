@@ -1,15 +1,16 @@
 // src/services/api.js
-import axios from 'axios';
+import axios from "axios";
 
-// Read Vite env variable correctly
+// Read Vite env variable
 const baseURL = import.meta.env.VITE_API_URL;
 
-console.log('🌐 API Base URL:', baseURL); // Debug log
+console.log("🌐 Loaded Base URL:", baseURL);
 
 const api = axios.create({
   baseURL,
   withCredentials: true,
 });
+
 
 // Add a request interceptor to include the auth token
 api.interceptors.request.use(config => {

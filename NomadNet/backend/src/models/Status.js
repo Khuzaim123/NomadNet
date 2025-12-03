@@ -44,4 +44,4 @@ StatusSchema.index({ location: '2dsphere' });
 // Only one active status per user
 StatusSchema.index({ user: 1 }, { unique: true });
 
-module.exports = mongoose.model('Status', StatusSchema);
+module.exports = mongoose.models.Status || mongoose.model('Status', StatusSchema);
