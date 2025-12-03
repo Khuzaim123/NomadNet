@@ -47,4 +47,4 @@ CheckInSchema.index({ location: '2dsphere' });
 CheckInSchema.index({ user: 1, expiresAt: 1 });
 CheckInSchema.index({ venue: 1, createdAt: -1 });
 
-module.exports = mongoose.model('CheckIn', CheckInSchema);
+module.exports = mongoose.models.CheckIn || mongoose.model('CheckIn', CheckInSchema);

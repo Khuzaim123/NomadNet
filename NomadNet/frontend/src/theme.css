@@ -1,51 +1,47 @@
-/* Import a nice font from Google Fonts */
+/* src/theme.css */
+
+/* Import font (if you want it globally) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Auth CSS Colors - Dark Theme */
+  /* Core palette */
   --primary: #6366f1;
   --primary-dark: #4f46e5;
   --primary-light: #818cf8;
-  --success: #10b981;
+  --success: #22c55e;
   --error: #ef4444;
   --warning: #f59e0b;
-  --bg-dark: #0f172a;
-  --bg-card: rgba(30, 41, 59, 0.8);
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
+
+  /* Dark theme */
+  --bg-dark: #020617;
+  --bg-card: rgba(15, 23, 42, 0.9);
+  --text-primary: #f9fafb;   /* bright white */
+  --text-secondary: #e5e7eb; /* light gray for secondary text */
   --border: #334155;
-  --shadow: rgba(0, 0, 0, 0.5);
-  
-  /* Additional colors */
-  --danger: #ef4444;
-  --text-dark: #f1f5f9;
-  --text-light: #94a3b8;
+  --shadow: rgba(15, 23, 42, 0.9);
+
+  /* Additional */
   --white: #ffffff;
-  --gray-light: rgba(51, 65, 85, 0.3);
+  --gray-light: #cbd5f5;
   --gray-dark: #64748b;
-  
-  /* Legacy aliases */
-  --peach: rgba(129, 140, 248, 0.2);
-  --cream: #0f172a;
-  --mint-light: rgba(99, 102, 241, 0.2);
-  --sage: #6366f1;
-  --forest: #4f46e5;
 }
 
+/* Base reset (can be minimal, index.css also resets) */
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 /* ✅ FIXED: Remove centering on desktop */
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-  color: #f1f5f9;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+
+  background: radial-gradient(circle at top, #1e293b 0, #020617 40%, #000 100%);
+  color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
+
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* ❌ REMOVED: display: flex; place-items: center; */
@@ -53,38 +49,30 @@ body {
   padding: 0;
 }
 
-button {
-  cursor: pointer;
-  font-family: 'Inter', sans-serif;
-}
-
+/* Global links */
 a {
   font-weight: 500;
-  color: #818cf8;
-  text-decoration: inherit;
+  color: var(--primary-light);
+  text-decoration: none;
   transition: color 0.3s;
 }
 
 a:hover {
-  color: #6366f1;
+  color: var(--primary);
+  text-decoration: underline;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-  color: #f1f5f9;
-}
-
+/* Global buttons */
 button {
+  cursor: pointer;
+  font-family: inherit;
   border-radius: 10px;
   border: 1px solid transparent;
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
-  font-family: inherit;
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: white;
-  cursor: pointer;
   transition: all 0.3s;
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
@@ -119,6 +107,7 @@ button:focus-visible {
   background: linear-gradient(180deg, #818cf8, #6366f1);
 }
 
+<<<<<<< HEAD
 /* ✅ App Container */
 #root {
   width: 100%;
@@ -128,4 +117,50 @@ button:focus-visible {
 .App {
   width: 100%;
   min-height: 100vh;
+=======
+/* Global typography helpers */
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+/* Center icons inside any .input-wrapper with .input-icon */
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.1rem;
+  height: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+/* Optional: base input styling (auth/chat can override) */
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.8);
+  color: var(--text-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-secondary);
+>>>>>>> e918cbf09f13eda2bd6d3b5a3e09c4e120d95bed
 }

@@ -6,6 +6,7 @@ import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
+import ChatPage from './pages/ChatPage';
 
 // Marketplace Pages
 import MarketplacePage from './pages/MarketplacePage';
@@ -15,6 +16,7 @@ import MyListingsPage from './pages/MyListingsPage';
 import EditListingPage from './pages/EditListingPage';
 
 import './App.css';
+import './styles/chat.css';
 
 function App() {
   return (
@@ -30,6 +32,9 @@ function App() {
 
             {/* Profile */}
             <Route path="/profile/:username" element={<ProfilePage />} />
+
+            {/* Chat */}
+            <Route path="/chat" element={<ChatPage />} />
 
             {/* Marketplace */}
             <Route path="/marketplace" element={<MarketplacePage />} />

@@ -15,12 +15,10 @@ export const getUserById = (userId) => {
   return api.get(`/api/users/${userId}`);
 };
 
-// Update user profile
 export const updateProfile = (userId, profileData) => {
   return api.put(`/api/users/${userId}`, profileData);
 };
 
-// Upload avatar
 export const uploadAvatar = (userId, file) => {
   const formData = new FormData();
   formData.append('avatar', file);
@@ -110,7 +108,6 @@ export const reportUser = (userId, reason) => {
   return api.post(`/api/users/${userId}/report`, { reason });
 };
 
-// Delete account
 export const deleteAccount = (userId) => {
   return api.delete(`/api/users/${userId}`);
 };

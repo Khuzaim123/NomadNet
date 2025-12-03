@@ -1,4 +1,4 @@
-// src/services/marketplaceService.js
+// src/services/api/marketplaceService.js
 import api from './api';
 
 // ======================

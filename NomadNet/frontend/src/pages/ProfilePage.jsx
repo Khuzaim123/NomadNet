@@ -1,7 +1,9 @@
+// src/pages/ProfilePage.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getUserByUsername } from '../services/userService';
-import { getCurrentUser } from '../services/authService';
+import { getCurrentUser, logout as logoutService } from '../services/authService'; // ⬅ import logout
+import ProfileHeader from '../components/ProfileHeader';
 import ProfileDetails from '../components/ProfileDetails';
 import EditProfileModal from '../components/EditProfileModal';
 import AvatarUploadModal from '../components/AvatarUploadModal';
@@ -29,7 +31,8 @@ const ProfilePage = () => {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const token =
+          localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) {
           console.warn('⚠️ No token found, redirecting to login');
           navigate('/');
@@ -37,8 +40,11 @@ const ProfilePage = () => {
         }
 
         const response = await getCurrentUser(token);
-        const fetchedCurrentUser = response?.data?.user || response?.user || response?.data || response;
-        
+        console.log('🔍 Current user response:', response);
+
+        const fetchedCurrentUser =
+          response?.data?.user || response?.user || response?.data || response;
+
         if (!fetchedCurrentUser) {
           console.error('❌ No current user returned:', response);
           navigate('/');
@@ -81,6 +87,8 @@ const ProfilePage = () => {
         setError('');
 
         const response = await getUserByUsername(username);
+        console.log('🔍 getUserByUsername raw response:', response);
+
         const fetchedUserRaw =
           response?.data?.data?.user ||
           response?.data?.user ||
@@ -106,7 +114,11 @@ const ProfilePage = () => {
         setIsOwner(fetchedUser._id === currentUser._id);
       } catch (err) {
         console.error('❌ Error fetching user:', err);
-        setError(err.response?.data?.message || err.message || 'Failed to fetch user profile.');
+        setError(
+          err.response?.data?.message ||
+            err.message ||
+            'Failed to fetch user profile.'
+        );
         if (err.response?.status === 404) {
           setTimeout(() => navigate('/not-found'), 1000);
         }
@@ -146,61 +158,88 @@ const ProfilePage = () => {
     setEditModalOpen(false);
   };
 
-  if (loading) return <div className="profile-container"><Spinner /></div>;
-  if (error) return <div className="profile-container error-message">{error}</div>;
-  if (!user) return <div className="profile-container error-message">User not found</div>;
+  const handleEditModalOpen = () => {
+    console.log('📝 Opening edit modal');
+    setEditModalOpen(true);
+  };
+
+  const handleEditModalClose = () => {
+    console.log('❌ Closing edit modal');
+    setEditModalOpen(false);
+  };
+
+  // 🔐 Logout handler
+  const handleLogout = async () => {
+    try {
+      const token =
+        localStorage.getItem('token') || sessionStorage.getItem('token');
+
+      if (token) {
+        // Call backend logout to mark user offline / update lastActive
+        await logoutService(token);
+      }
+
+      // Clear client-side auth data regardless of server response
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('user');
+
+      navigate('/');
+    } catch (err) {
+      console.error('❌ Logout error:', err);
+      // Even if server logout fails, ensure client is logged out
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/');
+    }
+  };
+
+  // Render
+  if (loading)
+    return (
+      <div className="profile-container">
+        <Spinner />
+      </div>
+    );
+  if (error)
+    return <div className="profile-container error-message">{error}</div>;
+  if (!user)
+    return (
+      <div className="profile-container error-message">User not found</div>
+    );
 
   return (
     <div className="profile-container">
-      {/* ✅ INLINE PROFILE HEADER (replaces ProfileHeader component) */}
-      <header className="profile-header-inline">
-        <div className="avatar-container-inline">
-          <img src={user.avatar} alt={user.displayName} className="profile-avatar" />
-          {isOwner && (
-            <button 
-              className="avatar-change-btn" 
-              onClick={() => setAvatarModalOpen(true)} 
-              title="Change Avatar"
-            >
-              <FiCamera />
-            </button>
-          )}
+      {/* Header row: ProfileHeader + Logout button */}
+      <div className="profile-header-row">
+        <div className="profile-header-main">
+          <ProfileHeader
+            user={user}
+            isOwner={isOwner}
+            onEditProfile={handleEditModalOpen}
+            onChangeAvatar={() => setAvatarModalOpen(true)}
+          />
         </div>
-        
-        <div className="profile-info-inline">
-          <h1 className="display-name">{user.displayName}</h1>
-          <p className="username">@{user.username}</p>
-          <p className="profession">{user.profession}</p>
-          
-          {!isOwner && (
-            <Link to={`/marketplace?user=${user._id}`} className="marketplace-badge-inline">
-              <FiShoppingBag /> View Marketplace Listings
-            </Link>
-          )}
-        </div>
-        
-        <div className="profile-actions-inline">
-          {isOwner ? (
-            <button className="action-btn primary" onClick={() => setEditModalOpen(true)}>
-              <FiEdit2 /> Edit Profile
-            </button>
-          ) : (
-            <>
-              <button className="action-btn">
-                <FiMessageSquare /> Message
-              </button>
-              <button className="action-btn danger" onClick={handleBlock}>
-                <FiSlash /> Block
-              </button>
-              <button className="action-btn secondary" onClick={handleReport}>
-                <FiAlertTriangle /> Report
-              </button>
-            </>
-          )}
-        </div>
-      </header>
 
-      {/* Profile Details */}
+        {isOwner && (
+          <button className="profile-logout-btn" onClick={handleLogout}>
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+              className="profile-logout-icon"
+            >
+              <path
+                fill="currentColor"
+                d="M16 13v-2H7V8l-4 4 4 4v-3h9zm2-10H8a2 2 0 0 0-2 2v3h2V5h10v14H8v-3H6v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"
+              />
+            </svg>
+            <span>Logout</span>
+          </button>
+        )}
+      </div>
+
       <ProfileDetails user={user} />
 
       {/* Modals */}
