@@ -300,7 +300,7 @@ exports.getStatusStats = async (req, res) => {
 // @access  Private
 exports.getContactsStatuses = async (req, res) => {
   try {
-    const Conversation = require('../models/conversation');
+    const Conversation = require('../models/Conversation');
     
     // Get all conversations of current user
     const conversations = await Conversation.find({
