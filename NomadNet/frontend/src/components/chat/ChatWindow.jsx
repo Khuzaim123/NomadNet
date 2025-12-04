@@ -1,5 +1,5 @@
 // src/components/chat/ChatWindow.jsx
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useChat } from '../../context/ChatContext';
 import MessageBubble from './MessageBubble';
@@ -24,20 +24,39 @@ const ChatWindow = () => {
     sendMessage,
     deleteMessage,
     emitTyping,
+    emitStopTyping,
     typingUsers,
     listingContext,
+    isConnected,
   } = useChat();
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const prevMessagesLengthRef = useRef(0);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Scroll to bottom when new messages arrive
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: smooth ? 'smooth' : 'auto' 
+      });
+    }
+  }, []);
 
+  // Scroll to bottom on new messages
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > prevMessagesLengthRef.current) {
+      scrollToBottom(true);
+    }
+    prevMessagesLengthRef.current = messages.length;
+  }, [messages.length, scrollToBottom]);
+
+  // Initial scroll on conversation load
+  useEffect(() => {
+    if (!messagesLoading && messages.length > 0) {
+      scrollToBottom(false);
+    }
+  }, [messagesLoading, activeConversation?._id]);
 
   // Loading state
   if (loading) {
@@ -68,13 +87,7 @@ const ChatWindow = () => {
   // Get other user with safety checks
   const otherUser = getOtherParticipant(activeConversation, currentUserId);
 
-  // If we can't find the other user, show an error state
   if (!otherUser) {
-    console.error('Could not find other participant:', {
-      activeConversation,
-      currentUserId,
-      participants: activeConversation?.participants
-    });
     return (
       <div className="chat-empty-state">
         <div className="chat-empty-icon">⚠️</div>
@@ -113,9 +126,15 @@ const ChatWindow = () => {
     }
   };
 
-  const handleTyping = (typing) => {
-    if (typing && activeConversation?._id) {
+  const handleTyping = () => {
+    if (activeConversation?._id) {
       emitTyping(activeConversation._id);
+    }
+  };
+
+  const handleStopTyping = () => {
+    if (activeConversation?._id) {
+      emitStopTyping?.(activeConversation._id);
     }
   };
 
@@ -143,6 +162,12 @@ const ChatWindow = () => {
                 </span>
               ) : (
                 <span className="chat-offline-status">Offline</span>
+              )}
+              {/* Connection indicator */}
+              {!isConnected && (
+                <span className="chat-connection-status disconnected">
+                  • Reconnecting...
+                </span>
               )}
             </div>
           </div>
@@ -223,6 +248,7 @@ const ChatWindow = () => {
               </div>
             ))}
 
+            {/* Typing indicator */}
             {isOtherUserTyping && (
               <div className="typing-indicator">
                 <img
@@ -247,10 +273,15 @@ const ChatWindow = () => {
       <MessageInput
         onSend={handleSendMessage}
         onTyping={handleTyping}
-        disabled={messagesLoading}
-        placeholder={listingContext
-          ? `Message about "${listingContext.title}"...`
-          : `Message ${otherUserName}...`}
+        onStopTyping={handleStopTyping}
+        disabled={messagesLoading || !isConnected}
+        placeholder={
+          !isConnected 
+            ? 'Connecting...'
+            : listingContext
+              ? `Message about "${listingContext.title}"...`
+              : `Message ${otherUserName}...`
+        }
       />
     </>
   );

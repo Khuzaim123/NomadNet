@@ -7,9 +7,12 @@ class SocketService {
   constructor() {
     this.socket = null;
     this.connected = false;
-    this.listeners = new Map();
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
+    this.maxReconnectAttempts = 10;
+    this.messageCallbacks = new Set();
+    this.typingCallbacks = new Set();
+    this.readCallbacks = new Set();
+    this.conversationCallbacks = new Set();
   }
 
   // ======================
@@ -18,8 +21,12 @@ class SocketService {
 
   connect(token) {
     if (this.socket?.connected) {
-      console.log('✅ Socket already connected');
+      console.log('✅ Socket already connected:', this.socket.id);
       return this.socket;
+    }
+
+    if (this.socket) {
+      this.socket.disconnect();
     }
 
     console.log('🔌 Connecting to Socket.IO server:', SOCKET_URL);
@@ -31,10 +38,11 @@ class SocketService {
       reconnectionDelayMax: 5000,
       reconnectionAttempts: this.maxReconnectAttempts,
       transports: ['websocket', 'polling'],
-      withCredentials: true
+      withCredentials: true,
+      timeout: 20000
     });
 
-    this.setupDefaultListeners();
+    this.setupEventListeners();
     return this.socket;
   }
 
@@ -45,13 +53,21 @@ class SocketService {
       this.socket = null;
       this.connected = false;
       this.reconnectAttempts = 0;
-      this.listeners.clear();
+      this.clearAllCallbacks();
     }
   }
 
-  setupDefaultListeners() {
+  clearAllCallbacks() {
+    this.messageCallbacks.clear();
+    this.typingCallbacks.clear();
+    this.readCallbacks.clear();
+    this.conversationCallbacks.clear();
+  }
+
+  setupEventListeners() {
     if (!this.socket) return;
 
+    // Connection events
     this.socket.on('connect', () => {
       console.log('✅ Socket connected:', this.socket.id);
       this.connected = true;
@@ -61,19 +77,92 @@ class SocketService {
     this.socket.on('disconnect', (reason) => {
       console.log('❌ Socket disconnected:', reason);
       this.connected = false;
-
-      if (reason === 'io server disconnect') {
-        setTimeout(() => this.socket?.connect(), 1000);
-      }
     });
 
     this.socket.on('connect_error', (error) => {
       console.error('❌ Socket connection error:', error.message);
       this.reconnectAttempts++;
+    });
 
-      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error('❌ Max reconnection attempts reached');
-      }
+    // Message events - call all registered callbacks
+    this.socket.on('newMessage', (message) => {
+      console.log('📥 New message received via socket:', message._id);
+      this.messageCallbacks.forEach(callback => {
+        try {
+          callback(message);
+        } catch (error) {
+          console.error('Message callback error:', error);
+        }
+      });
+    });
+
+    // Typing events
+    this.socket.on('userTyping', (data) => {
+      this.typingCallbacks.forEach(callback => {
+        try {
+          callback({ ...data, isTyping: true });
+        } catch (error) {
+          console.error('Typing callback error:', error);
+        }
+      });
+    });
+
+    this.socket.on('userStoppedTyping', (data) => {
+      this.typingCallbacks.forEach(callback => {
+        try {
+          callback({ ...data, isTyping: false });
+        } catch (error) {
+          console.error('Typing callback error:', error);
+        }
+      });
+    });
+
+    // Read receipts
+    this.socket.on('messagesRead', (data) => {
+      console.log('👀 Messages read:', data);
+      this.readCallbacks.forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error('Read callback error:', error);
+        }
+      });
+    });
+
+    this.socket.on('messageRead', (data) => {
+      this.readCallbacks.forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error('Read callback error:', error);
+        }
+      });
+    });
+
+    // Conversation updates
+    this.socket.on('conversationUpdated', (conversation) => {
+      console.log('🔄 Conversation updated:', conversation._id);
+      this.conversationCallbacks.forEach(callback => {
+        try {
+          callback(conversation);
+        } catch (error) {
+          console.error('Conversation callback error:', error);
+        }
+      });
+    });
+
+    // User status
+    this.socket.on('userOnline', (userId) => {
+      console.log('🟢 User online:', userId);
+    });
+
+    this.socket.on('userOffline', (userId) => {
+      console.log('🔴 User offline:', userId);
+    });
+
+    // Error handling
+    this.socket.on('messageError', (error) => {
+      console.error('❌ Message error:', error);
     });
 
     this.socket.on('error', (error) => {
@@ -98,114 +187,90 @@ class SocketService {
   }
 
   // ======================
-  // 📤 Emit Events
+  // 📤 Send Message via Socket
   // ======================
 
-  sendMessage(message) {
-    if (!this.ensureConnected()) return;
-    this.socket.emit('newMessage', message);
+  sendMessage(messageData) {
+    if (!this.ensureConnected()) {
+      console.error('Cannot send message: socket not connected');
+      return false;
+    }
+    
+    console.log('📤 Sending message via socket:', messageData);
+    this.socket.emit('sendMessage', messageData);
+    return true;
   }
+
+  // ======================
+  // ⌨️ Typing Indicators
+  // ======================
 
   emitTyping(conversationId) {
     if (!this.ensureConnected()) return;
     this.socket.emit('typing', { conversationId });
   }
 
-  sendTyping(conversationId, userId, username) {
+  emitStopTyping(conversationId) {
     if (!this.ensureConnected()) return;
-    this.socket.emit('typing', { conversationId, userId, username });
+    this.socket.emit('stopTyping', { conversationId });
   }
+
+  // ======================
+  // ✅ Mark as Read
+  // ======================
 
   markAsRead(conversationId, messageIds) {
     if (!this.ensureConnected()) return;
-    this.socket.emit('markRead', { conversationId, messageIds });
+    this.socket.emit('markAsRead', { conversationId, messageIds });
   }
 
   // ======================
-  // 📥 Event Listeners (Methods ChatContext expects)
+  // 📥 Event Subscription Methods
   // ======================
 
-  // ✅ Listen for new messages
   onNewMessage(callback) {
-    if (!this.socket) {
-      console.warn('⚠️ Socket not initialized for onNewMessage');
-      return;
-    }
-    this.socket.on('newMessage', (message) => {
-      console.log('📥 New message received:', message);
-      callback(message);
-    });
+    this.messageCallbacks.add(callback);
+    return () => this.messageCallbacks.delete(callback);
   }
 
-  // ✅ Listen for message read events
-  onMessageRead(callback) {
-    if (!this.socket) {
-      console.warn('⚠️ Socket not initialized for onMessageRead');
-      return;
-    }
-    this.socket.on('messageRead', (data) => {
-      console.log('👀 Message read:', data);
-      callback(data);
-    });
-  }
-
-  // ✅ Listen for typing events
   onTyping(callback) {
-    if (!this.socket) {
-      console.warn('⚠️ Socket not initialized for onTyping');
-      return;
-    }
-    this.socket.on('typing', (data) => {
-      callback(data);
-    });
-    this.socket.on('userTyping', (data) => {
-      callback(data);
-    });
+    this.typingCallbacks.add(callback);
+    return () => this.typingCallbacks.delete(callback);
   }
 
-  // ✅ Listen for user online status
-  onUserOnline(callback) {
-    if (!this.socket) return;
-    this.socket.on('userOnline', (userId) => {
-      console.log('🟢 User online:', userId);
-      callback(userId);
-    });
+  onMessageRead(callback) {
+    this.readCallbacks.add(callback);
+    return () => this.readCallbacks.delete(callback);
   }
 
-  // ✅ Listen for user offline status
-  onUserOffline(callback) {
-    if (!this.socket) return;
-    this.socket.on('userOffline', (userId) => {
-      console.log('🔴 User offline:', userId);
-      callback(userId);
-    });
-  }
-
-  // ✅ Listen for conversation updates
   onConversationUpdated(callback) {
-    if (!this.socket) return;
-    this.socket.on('conversationUpdated', (conversation) => {
-      console.log('🔄 Conversation updated:', conversation);
-      callback(conversation);
-    });
+    this.conversationCallbacks.add(callback);
+    return () => this.conversationCallbacks.delete(callback);
   }
 
-  // ✅ Listen for errors
-  onError(callback) {
-    if (!this.socket) return;
-    this.socket.on('error', (error) => {
-      console.error('❌ Socket error:', error);
-      callback(error);
-    });
+  // Remove specific callback
+  offNewMessage(callback) {
+    this.messageCallbacks.delete(callback);
+  }
+
+  offTyping(callback) {
+    this.typingCallbacks.delete(callback);
+  }
+
+  offMessageRead(callback) {
+    this.readCallbacks.delete(callback);
+  }
+
+  offConversationUpdated(callback) {
+    this.conversationCallbacks.delete(callback);
   }
 
   // ======================
-  // 🗺️ Map Events
+  // 📍 Map Events
   // ======================
 
   joinMapArea(longitude, latitude, radius = 5000) {
     if (!this.ensureConnected()) return;
-    console.log('📍 Joining map area:', { longitude, latitude, radius });
     this.socket.emit('map:join', { longitude, latitude, radius });
   }
 
@@ -215,60 +280,8 @@ class SocketService {
   }
 
   // ======================
-  // 📡 Generic Event Listeners
+  // 🔧 Utilities
   // ======================
-
-  on(event, callback) {
-    if (!this.socket) {
-      console.warn('⚠️ Socket not initialized');
-      return;
-    }
-
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, []);
-    }
-    this.listeners.get(event).push(callback);
-
-    this.socket.on(event, callback);
-  }
-
-  off(event, callback) {
-    if (!this.socket) return;
-
-    this.socket.off(event, callback);
-
-    if (this.listeners.has(event)) {
-      const callbacks = this.listeners.get(event);
-      const index = callbacks.indexOf(callback);
-      if (index > -1) {
-        callbacks.splice(index, 1);
-      }
-    }
-  }
-
-  removeAllListeners(event) {
-    if (!this.socket) return;
-
-    if (event) {
-      this.socket.off(event);
-      this.listeners.delete(event);
-    } else {
-      this.socket.removeAllListeners();
-      this.listeners.clear();
-    }
-  }
-
-  // ======================
-  // 📊 Status & Utilities
-  // ======================
-
-  isConnected() {
-    return this.socket?.connected || false;
-  }
-
-  getSocketId() {
-    return this.socket?.id || null;
-  }
 
   ensureConnected() {
     if (!this.socket?.connected) {
@@ -276,6 +289,14 @@ class SocketService {
       return false;
     }
     return true;
+  }
+
+  isConnected() {
+    return this.socket?.connected || false;
+  }
+
+  getSocketId() {
+    return this.socket?.id || null;
   }
 
   ping() {

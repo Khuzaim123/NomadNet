@@ -11,6 +11,7 @@ const MessageBubble = ({ message, currentUserId, onDelete }) => {
   // Determine if message is sent by current user
   const senderId = getUserId(message.sender);
   const isSent = isSameUser(senderId, currentUserId);
+  const isPending = message.pending;
 
   // Get sender info safely
   const senderName = typeof message.sender === 'object'
@@ -28,7 +29,7 @@ const MessageBubble = ({ message, currentUserId, onDelete }) => {
   };
 
   return (
-    <div className={`message-bubble-wrapper ${isSent ? 'sent' : 'received'}`}>
+    <div className={`message-bubble-wrapper ${isSent ? 'sent' : 'received'} ${isPending ? 'pending' : ''}`}>
       <div className="message-bubble-content">
         {/* Avatar for received messages */}
         {!isSent && (
@@ -43,7 +44,7 @@ const MessageBubble = ({ message, currentUserId, onDelete }) => {
           />
         )}
 
-        <div className="message-bubble">
+        <div className={`message-bubble ${isPending ? 'message-pending' : ''}`}>
           {/* Message Image if exists */}
           {message.image && (
             <img
@@ -69,10 +70,14 @@ const MessageBubble = ({ message, currentUserId, onDelete }) => {
               {formatMessageTimestamp(message.createdAt)}
             </span>
 
-            {/* Read indicator for sent messages */}
+            {/* Status indicator for sent messages */}
             {isSent && (
-              <span className="message-read-indicator">
-                {message.isRead || message.read ? (
+              <span className="message-status-indicator">
+                {isPending ? (
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="pending-icon">
+                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.3"/>
+                  </svg>
+                ) : message.isRead || message.read ? (
                   <svg viewBox="0 0 24 24" fill="currentColor" className="read-icon">
                     <path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z" />
                   </svg>
@@ -85,8 +90,8 @@ const MessageBubble = ({ message, currentUserId, onDelete }) => {
             )}
           </div>
 
-          {/* Message Menu Button (only for own messages) */}
-          {isSent && (
+          {/* Message Menu Button (only for own messages, not pending) */}
+          {isSent && !isPending && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

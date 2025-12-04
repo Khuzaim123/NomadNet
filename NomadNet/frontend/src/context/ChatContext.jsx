@@ -5,13 +5,14 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from 'react';
 import { useLocation } from 'react-router-dom';
 import chatService from '../services/chatService';
 import socketService from '../services/socketService';
 import { getToken, getUser } from '../services/authService';
 
-const ChatContext = createContext(null); // ✅ give it a default null
+const ChatContext = createContext(null);
 
 export const useChat = () => {
   const context = useContext(ChatContext);
@@ -22,7 +23,6 @@ export const useChat = () => {
 };
 
 export const ChatProvider = ({ children }) => {
-  // ✅ useLocation is ONLY called inside the component
   const location = useLocation();
   const user = getUser();
   const token = getToken();
@@ -36,6 +36,194 @@ export const ChatProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [typingUsers, setTypingUsers] = useState({});
   const [listingContext, setListingContext] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Refs to track current state in callbacks
+  const activeConversationRef = useRef(activeConversation);
+  const messagesRef = useRef(messages);
+
+  // Keep refs in sync
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Get current user ID
+  const currentUserId = user?._id || user?.id;
+
+  // ================== SOCKET CONNECTION ==================
+  useEffect(() => {
+    if (!token) {
+      console.log('No token, skipping socket connection');
+      return;
+    }
+
+    console.log('🔌 Initializing socket connection...');
+    const socket = socketService.connect(token);
+
+    // Handle connection status
+    const handleConnect = () => {
+      console.log('✅ Socket connected in ChatContext');
+      setIsConnected(true);
+    };
+
+    const handleDisconnect = () => {
+      console.log('❌ Socket disconnected in ChatContext');
+      setIsConnected(false);
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+
+    // Set initial connection status
+    setIsConnected(socket.connected);
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socketService.disconnect();
+    };
+  }, [token]);
+
+  // ================== SOCKET EVENT HANDLERS ==================
+  useEffect(() => {
+    if (!isConnected) return;
+
+    console.log('📡 Setting up socket event listeners...');
+
+    // Handle new messages
+    const handleNewMessage = (message) => {
+      console.log('📥 Received new message:', message._id);
+      
+      const currentConversation = activeConversationRef.current;
+      const conversationId = message.conversation?._id || message.conversation;
+
+      // Check if message is for active conversation
+      if (currentConversation && currentConversation._id === conversationId) {
+        setMessages((prev) => {
+          // Prevent duplicates
+          if (prev.some((m) => m._id === message._id)) {
+            console.log('Message already exists, skipping');
+            return prev;
+          }
+          console.log('Adding message to state');
+          return [...prev, message];
+        });
+
+        // Mark as read if we're the receiver
+        const receiverId = message.receiver?._id || message.receiver;
+        if (receiverId === currentUserId) {
+          socketService.markAsRead(conversationId, [message._id]);
+        }
+      } else {
+        // Message for different conversation - update unread count
+        setUnreadCount((prev) => prev + 1);
+      }
+
+      // Update conversations list
+      updateConversationWithMessage(message);
+    };
+
+    // Handle typing indicators
+    const handleTyping = (data) => {
+      const { conversationId, userId, isTyping } = data;
+      
+      if (isTyping) {
+        setTypingUsers((prev) => ({
+          ...prev,
+          [conversationId]: userId
+        }));
+
+        // Clear typing indicator after 3 seconds
+        setTimeout(() => {
+          setTypingUsers((prev) => {
+            const updated = { ...prev };
+            if (updated[conversationId] === userId) {
+              delete updated[conversationId];
+            }
+            return updated;
+          });
+        }, 3000);
+      } else {
+        setTypingUsers((prev) => {
+          const updated = { ...prev };
+          delete updated[conversationId];
+          return updated;
+        });
+      }
+    };
+
+    // Handle read receipts
+    const handleMessageRead = (data) => {
+      console.log('👀 Message read event:', data);
+      const { messageIds, conversationId, readBy, readAt } = data;
+
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (messageIds?.includes(msg._id) || msg._id === data.messageId) {
+            return { ...msg, isRead: true, readAt: readAt || data.readAt };
+          }
+          return msg;
+        })
+      );
+    };
+
+    // Handle conversation updates
+    const handleConversationUpdated = (conversation) => {
+      console.log('🔄 Conversation updated:', conversation._id);
+      setConversations((prev) => {
+        const index = prev.findIndex((c) => c._id === conversation._id);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = { ...updated[index], ...conversation };
+          // Sort by most recent
+          return updated.sort((a, b) => 
+            new Date(b.updatedAt) - new Date(a.updatedAt)
+          );
+        }
+        return [conversation, ...prev];
+      });
+    };
+
+    // Register callbacks
+    const unsubMessage = socketService.onNewMessage(handleNewMessage);
+    const unsubTyping = socketService.onTyping(handleTyping);
+    const unsubRead = socketService.onMessageRead(handleMessageRead);
+    const unsubConversation = socketService.onConversationUpdated(handleConversationUpdated);
+
+    return () => {
+      unsubMessage();
+      unsubTyping();
+      unsubRead();
+      unsubConversation();
+    };
+  }, [isConnected, currentUserId]);
+
+  // ================== HELPER: UPDATE CONVERSATION WITH NEW MESSAGE ==================
+  const updateConversationWithMessage = useCallback((message) => {
+    const conversationId = message.conversation?._id || message.conversation;
+    
+    setConversations((prev) => {
+      const conversationIndex = prev.findIndex((c) => c._id === conversationId);
+      
+      if (conversationIndex >= 0) {
+        const updated = [...prev];
+        updated[conversationIndex] = {
+          ...updated[conversationIndex],
+          lastMessage: message,
+          updatedAt: message.createdAt
+        };
+        // Move to top
+        const [conversation] = updated.splice(conversationIndex, 1);
+        return [conversation, ...updated];
+      }
+      
+      return prev;
+    });
+  }, []);
 
   // ================== LOAD CONVERSATIONS ==================
   const loadConversations = useCallback(async (archived = false) => {
@@ -90,6 +278,7 @@ export const ChatProvider = ({ children }) => {
         )
       );
 
+      // Join socket room for real-time updates
       socketService.joinConversation(conversationId);
     } catch (err) {
       console.error('Load messages error:', err);
@@ -103,51 +292,50 @@ export const ChatProvider = ({ children }) => {
   const sendMessage = useCallback(
     async (messageData) => {
       try {
+        const { conversationId, receiverId, content, messageType = 'text' } = messageData;
+
+        if (!content?.trim()) {
+          throw new Error('Message content is required');
+        }
+
+        // Optimistic update - add message immediately
+        const optimisticMessage = {
+          _id: `temp-${Date.now()}`,
+          conversation: conversationId,
+          sender: user,
+          receiver: receiverId,
+          content: content.trim(),
+          type: messageType,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          pending: true
+        };
+
+        setMessages((prev) => [...prev, optimisticMessage]);
+
+        // Send via API (which will also emit socket event)
         const response = await chatService.sendMessage(messageData);
         const newMessage = response.data?.message || response.data;
 
-        setMessages((prev) => [...prev, newMessage]);
-
-        // Optionally refresh conversations or update lastMessage locally
-        await loadConversations();
+        // Replace optimistic message with real one
+        setMessages((prev) => 
+          prev.map((msg) => 
+            msg._id === optimisticMessage._id ? newMessage : msg
+          )
+        );
 
         return newMessage;
       } catch (err) {
+        // Remove optimistic message on error
+        setMessages((prev) => 
+          prev.filter((msg) => !msg.pending)
+        );
         setError(err.message || 'Failed to send message');
         throw err;
       }
     },
-    [loadConversations]
+    [user]
   );
-
-  // ================== SOCKET: NEW MESSAGE ==================
-  const handleNewMessage = useCallback(
-    (message) => {
-      if (activeConversation && message.conversation === activeConversation._id) {
-        setMessages((prev) => {
-          if (prev.some((m) => m._id === message._id)) return prev;
-          return [...prev, message];
-        });
-        chatService.markConversationAsRead(activeConversation._id);
-      } else {
-        setUnreadCount((prev) => prev + 1);
-      }
-
-      loadConversations();
-    },
-    [activeConversation, loadConversations]
-  );
-
-  // ================== SOCKET: MESSAGE READ ==================
-  const handleMessageRead = useCallback((data) => {
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg._id === data.messageId
-          ? { ...msg, isRead: true, readAt: data.readAt }
-          : msg
-      )
-    );
-  }, []);
 
   // ================== CREATE/GET CONVERSATION ==================
   const createConversation = useCallback(
@@ -174,24 +362,26 @@ export const ChatProvider = ({ children }) => {
   // ================== SELECT CONVERSATION ==================
   const selectConversation = useCallback(
     async (conversation) => {
+      // Leave previous conversation room
       if (activeConversation?._id) {
         socketService.leaveConversation(activeConversation._id);
       }
 
       setActiveConversation(conversation);
-      setListingContext(null); // clear listing context when user picks one
+      setListingContext(null);
       await loadMessages(conversation._id);
     },
     [activeConversation, loadMessages]
   );
 
-  // ================== ARCHIVE / DELETE CONVERSATION ==================
+  // ================== ARCHIVE CONVERSATION ==================
   const archiveConversation = useCallback(
     async (conversationId) => {
       try {
         await chatService.toggleArchiveConversation(conversationId);
         await loadConversations();
         if (activeConversation?._id === conversationId) {
+          socketService.leaveConversation(conversationId);
           setActiveConversation(null);
           setMessages([]);
         }
@@ -203,12 +393,14 @@ export const ChatProvider = ({ children }) => {
     [activeConversation, loadConversations]
   );
 
+  // ================== DELETE CONVERSATION ==================
   const deleteConversation = useCallback(
     async (conversationId) => {
       try {
         await chatService.deleteConversation(conversationId);
         await loadConversations();
         if (activeConversation?._id === conversationId) {
+          socketService.leaveConversation(conversationId);
           setActiveConversation(null);
           setMessages([]);
         }
@@ -236,7 +428,11 @@ export const ChatProvider = ({ children }) => {
     socketService.emitTyping(conversationId);
   }, []);
 
-  // ================== HANDLE NAV FROM LISTING ==================
+  const emitStopTyping = useCallback((conversationId) => {
+    socketService.emitStopTyping(conversationId);
+  }, []);
+
+  // ================== HANDLE NAVIGATION STATE ==================
   useEffect(() => {
     const state = location.state;
     if (!state?.conversationId) return;
@@ -251,13 +447,10 @@ export const ChatProvider = ({ children }) => {
         );
 
         if (!conversation && state.otherUser) {
-          const currentUser = getUser();
-          const currentUserId = currentUser?._id || currentUser?.id;
-
           conversation = {
             _id: conversationId,
             participants: [
-              { _id: currentUserId, ...currentUser },
+              { _id: currentUserId, ...user },
               {
                 _id: state.otherUser._id || state.otherUser.id,
                 ...state.otherUser,
@@ -291,31 +484,14 @@ export const ChatProvider = ({ children }) => {
         window.history.replaceState({}, document.title);
       }
     })();
-  }, [location.state, conversations, loadMessages]);
+  }, [location.state, conversations, loadMessages, currentUserId, user]);
 
-  // ================== SOCKET SETUP ==================
+  // ================== INITIAL LOAD ==================
   useEffect(() => {
-    if (!token) return;
-
-    socketService.connect(token);
-
-    socketService.onNewMessage(handleNewMessage);
-    socketService.onMessageRead(handleMessageRead);
-    socketService.onTyping((data) => {
-      setTypingUsers((prev) => ({ ...prev, [data.conversationId]: data.userId }));
-      setTimeout(() => {
-        setTypingUsers((prev) => {
-          const updated = { ...prev };
-          delete updated[data.conversationId];
-          return updated;
-        });
-      }, 3000);
-    });
-
-    return () => {
-      socketService.disconnect();
-    };
-  }, [token, handleNewMessage, handleMessageRead]);
+    if (token) {
+      loadConversations();
+    }
+  }, [token, loadConversations]);
 
   const value = {
     user,
@@ -329,6 +505,7 @@ export const ChatProvider = ({ children }) => {
     unreadCount,
     typingUsers,
     listingContext,
+    isConnected,
     loadConversations,
     loadMessages,
     sendMessage,
@@ -338,6 +515,7 @@ export const ChatProvider = ({ children }) => {
     deleteConversation,
     deleteMessage,
     emitTyping,
+    emitStopTyping,
     setError,
     setListingContext,
   };
