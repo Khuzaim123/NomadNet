@@ -1,5 +1,6 @@
+// src/controllers/messageController.js
 const Message = require('../models/Message');
-const Conversation = require('../models/Conversation');
+const Conversation = require('../models/conversation');
 const User = require('../models/User');
 
 // @desc    Send a message
@@ -23,13 +24,12 @@ exports.sendMessage = async (req, res) => {
     let conversation = await Conversation.findById(conversationId);
     
     if (!conversation) {
-      // Create new conversation
       conversation = await Conversation.create({
         participants: [senderId, receiverId],
-        unreadCount: {
-          [senderId]: 0,
-          [receiverId]: 0
-        }
+        unreadCount: new Map([
+          [senderId, 0],
+          [receiverId, 0]
+        ])
       });
     }
 
@@ -45,13 +45,13 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-      // Create message – map messageType → type
+    // Create message
     const message = await Message.create({
       conversation: conversation._id,
       sender: senderId,
       receiver: receiverId,
       content,
-      type: messageType,             
+      type: messageType,
       attachments: attachments || [],
     });
 
@@ -60,25 +60,54 @@ exports.sendMessage = async (req, res) => {
     const currentUnreadCount = conversation.unreadCount.get(receiverId) || 0;
     conversation.unreadCount.set(receiverId, currentUnreadCount + 1);
     
-    // Remove from archived if it was archived
     conversation.archivedBy = conversation.archivedBy.filter(
       id => id.toString() !== senderId
     );
     
     await conversation.save();
 
-    // Populate message
-    await message.populate('sender', 'name email avatar');
-    await message.populate('receiver', 'name email avatar');
+    // Populate message with sender and receiver info
+    await message.populate('sender', 'name email avatar username displayName');
+    await message.populate('receiver', 'name email avatar username displayName');
+
+    // ✅ REAL-TIME: Emit socket event to all participants
+    const io = req.app.get('io');
+    if (io) {
+      const messageData = {
+        _id: message._id,
+        conversation: conversation._id,
+        sender: message.sender,
+        receiver: message.receiver,
+        content: message.content,
+        type: message.type,
+        attachments: message.attachments,
+        createdAt: message.createdAt,
+        isRead: false
+      };
+
+      // Emit to conversation room
+      io.to(conversation._id.toString()).emit('newMessage', messageData);
+      
+      // Also emit to receiver's personal room for notifications
+      io.to(`user:${receiverId}`).emit('newMessage', messageData);
+      
+      // Emit conversation update for sidebar
+      const conversationUpdate = await Conversation.findById(conversation._id)
+        .populate('participants', 'name email avatar username displayName')
+        .populate('lastMessage');
+      
+      io.to(`user:${receiverId}`).emit('conversationUpdated', conversationUpdate);
+      io.to(`user:${senderId}`).emit('conversationUpdated', conversationUpdate);
+
+      console.log(`📨 Message emitted to conversation: ${conversation._id}`);
+    }
 
     res.status(201).json({
       success: true,
       data: message
     });
-
-    // TODO: Emit socket event for real-time messaging
-    // io.to(receiverId).emit('newMessage', message);
   } catch (error) {
+    console.error('Send message error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -96,7 +125,6 @@ exports.getMessages = async (req, res) => {
     const { page = 1, limit = 50 } = req.query;
     const userId = req.user.id;
 
-    // Verify conversation exists and user is participant
     const conversation = await Conversation.findById(conversationId);
     
     if (!conversation) {
@@ -117,13 +145,12 @@ exports.getMessages = async (req, res) => {
       });
     }
 
-    // Get messages (excluding deleted ones for this user)
     const messages = await Message.find({
       conversation: conversationId,
       deletedBy: { $ne: userId }
     })
-      .populate('sender', 'name email avatar')
-      .populate('receiver', 'name email avatar')
+      .populate('sender', 'name email avatar username displayName')
+      .populate('receiver', 'name email avatar username displayName')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -135,7 +162,7 @@ exports.getMessages = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: messages.reverse(), // Reverse to show oldest first
+      data: messages.reverse(),
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(total / limit),
@@ -166,7 +193,6 @@ exports.markMessageAsRead = async (req, res) => {
       });
     }
 
-    // Only receiver can mark as read
     if (message.receiver.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
@@ -179,12 +205,21 @@ exports.markMessageAsRead = async (req, res) => {
       message.readAt = new Date();
       await message.save();
 
-      // Update conversation unread count
       const conversation = await Conversation.findById(message.conversation);
       if (conversation) {
         const currentCount = conversation.unreadCount.get(req.user.id) || 0;
         conversation.unreadCount.set(req.user.id, Math.max(0, currentCount - 1));
         await conversation.save();
+      }
+
+      // ✅ REAL-TIME: Emit read receipt
+      const io = req.app.get('io');
+      if (io) {
+        io.to(message.conversation.toString()).emit('messageRead', {
+          messageId: message._id,
+          readBy: req.user.id,
+          readAt: message.readAt
+        });
       }
     }
 
@@ -201,7 +236,7 @@ exports.markMessageAsRead = async (req, res) => {
   }
 };
 
-// @desc    Delete message (for current user)
+// @desc    Delete message
 // @route   DELETE /api/messages/:id
 // @access  Private
 exports.deleteMessage = async (req, res) => {
@@ -215,7 +250,6 @@ exports.deleteMessage = async (req, res) => {
       });
     }
 
-    // Check if user is sender or receiver
     const isAuthorized = 
       message.sender.toString() === req.user.id ||
       message.receiver.toString() === req.user.id;
@@ -227,16 +261,23 @@ exports.deleteMessage = async (req, res) => {
       });
     }
 
-    // Add user to deletedBy array
     if (!message.deletedBy.includes(req.user.id)) {
       message.deletedBy.push(req.user.id);
       await message.save();
     }
 
-    // If both users deleted, mark as deleted
     if (message.deletedBy.length === 2) {
       message.isDeleted = true;
       await message.save();
+    }
+
+    // ✅ REAL-TIME: Emit message deleted event
+    const io = req.app.get('io');
+    if (io) {
+      io.to(message.conversation.toString()).emit('messageDeleted', {
+        messageId: message._id,
+        deletedBy: req.user.id
+      });
     }
 
     res.status(200).json({

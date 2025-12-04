@@ -1,48 +1,79 @@
 // src/components/chat/MessageInput.jsx
 import React, { useState, useRef, useEffect } from 'react';
 
-const MessageInput = ({ onSend, onTyping, disabled, placeholder = 'Type a message...' }) => {
+const MessageInput = ({ 
+  onSend, 
+  onTyping, 
+  onStopTyping,
+  disabled, 
+  placeholder = 'Type a message...' 
+}) => {
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const textareaRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
+  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + 'px';
     }
   }, [message]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleChange = (e) => {
-    setMessage(e.target.value);
+    const value = e.target.value;
+    setMessage(value);
     
-    if (!isTyping) {
+    // Emit typing indicator
+    if (value.trim() && !isTyping) {
       setIsTyping(true);
       onTyping?.(true);
     }
 
+    // Clear previous timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
 
+    // Set new timeout to stop typing
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      onTyping?.(false);
+      onStopTyping?.();
     }, 2000);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    if (!message.trim() || disabled) return;
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage || disabled) return;
 
-    onSend(message.trim());
+    // Send message
+    onSend(trimmedMessage);
+    
+    // Clear input
     setMessage('');
     setIsTyping(false);
     
+    // Stop typing indicator
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
+    }
+    onStopTyping?.();
+
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
     }
   };
 
