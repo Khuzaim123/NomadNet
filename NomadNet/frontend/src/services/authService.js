@@ -1,4 +1,8 @@
-const API_URL = 'http://localhost:39300/api';
+// src/services/authService.js
+import api from "./api";
+
+// Get the API URL from the api instance
+const API_URL = api.defaults.baseURL;
 
 console.log('🔗 API URL:', API_URL);
 console.log('🌍 Current page:', window.location.href);
@@ -6,18 +10,11 @@ console.log('🌍 Current page:', window.location.href);
 // Test connection immediately
 (async () => {
   try {
-    console.log('🔄 Testing backend connection...');
-    const response = await fetch('http://localhost:39300/api/health', {
-      method: 'GET',
-      mode: 'cors',
-    });
-    const data = await response.json();
-    console.log('✅ Backend is online!', data);
+    console.log('Testing backend connection...');
+    const res = await api.get('/api/health');
+    console.log('Backend is online!', res.data);
   } catch (error) {
-    console.error('❌ Backend connection failed!');
-    console.error('   Error:', error.message);
-    console.error('   Name:', error.name);
-    console.error('   Stack:', error.stack);
+    console.error('Backend connection failed!', error.message);
   }
 })();
 
@@ -37,7 +34,6 @@ const fetchWithDebug = async (url, options = {}) => {
     console.log('   Status:', response.status, response.statusText);
     console.log('   Headers:', Object.fromEntries(response.headers.entries()));
     
-    // Clone response to read it twice
     const clonedResponse = response.clone();
     let data;
     
@@ -80,7 +76,7 @@ export const register = async (userData) => {
     console.log('📧 User data:', { ...userData, password: '***' });
     
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/register`,
+      `${API_URL}/api/auth/register`,
       {
         method: 'POST',
         headers: {
@@ -125,7 +121,7 @@ export const verifyOTP = async (email, otp) => {
     console.log('\n🔐 VERIFY OTP CALLED');
     
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/verify-otp`,
+      `${API_URL}/api/auth/verify-otp`,
       {
         method: 'POST',
         headers: {
@@ -155,7 +151,7 @@ export const resendOTP = async (email) => {
     console.log('\n🔄 RESEND OTP CALLED');
     
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/resend-otp`,
+      `${API_URL}/api/auth/resend-otp`,
       {
         method: 'POST',
         headers: {
@@ -185,7 +181,7 @@ export const login = async (email, password) => {
     console.log('\n🔐 LOGIN CALLED');
     
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/login`,
+      `${API_URL}/api/auth/login`,
       {
         method: 'POST',
         headers: {
@@ -213,7 +209,7 @@ export const login = async (email, password) => {
 export const getCurrentUser = async (token) => {
   try {
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/me`,
+      `${API_URL}/api/auth/me`,
       {
         method: 'GET',
         headers: {
@@ -240,7 +236,7 @@ export const getCurrentUser = async (token) => {
 export const forgotPassword = async (email) => {
   try {
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/forgot-password`,
+      `${API_URL}/api/auth/forgot-password`,
       {
         method: 'POST',
         headers: {
@@ -268,7 +264,7 @@ export const forgotPassword = async (email) => {
 export const resetPassword = async (email, otp, newPassword) => {
   try {
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/reset-password`,
+      `${API_URL}/api/auth/reset-password`,
       {
         method: 'POST',
         headers: {
@@ -296,7 +292,7 @@ export const resetPassword = async (email, otp, newPassword) => {
 export const changePasswordRequest = async (token, currentPassword, newPassword) => {
   try {
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/change-password/request`,
+      `${API_URL}/api/auth/change-password/request`,
       {
         method: 'POST',
         headers: {
@@ -325,7 +321,7 @@ export const changePasswordRequest = async (token, currentPassword, newPassword)
 export const changePasswordVerify = async (token, otp) => {
   try {
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/change-password/verify`,
+      `${API_URL}/api/auth/change-password/verify`,
       {
         method: 'POST',
         headers: {
@@ -354,7 +350,7 @@ export const changePasswordVerify = async (token, otp) => {
 export const logout = async (token) => {
   try {
     const { response, data } = await fetchWithDebug(
-      `${API_URL}/auth/logout`,
+      `${API_URL}/api/auth/logout`,
       {
         method: 'POST',
         headers: {
