@@ -24,6 +24,7 @@
     "process-nextick-args": "^2.0.1",
     "react-router-dom": "^7.9.6",
     "readable-stream": "^4.7.0",
+    "resend": "^6.5.2",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
