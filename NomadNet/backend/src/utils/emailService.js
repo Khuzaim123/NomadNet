@@ -1,52 +1,32 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// Helper function to send email with retry logic
-const sendEmailWithRetry = async (emailOptions, retries = 3) => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const { data, error } = await resend.emails.send(emailOptions);
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      console.log(`✅ Email sent successfully to: ${emailOptions.to}`);
-      return data;
-    } catch (error) {
-      console.error(`❌ Email send attempt ${i + 1} failed:`, error.message);
-      
-      if (i < retries - 1) {
-        console.log('🔄 Retrying in 2 seconds...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      } else {
-        throw error;
-      }
-    }
+// Create Gmail transporter
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: true, // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS.replace(/\s/g, '')
+    // Remove any spaces from app password
+  },
+  tls: {
+    rejectUnauthorized: false
   }
-};
+});
 
-// Verify Resend configuration on startup
-const verifyResendConnection = async () => {
-  try {
-    // Test API key by fetching domains (lightweight check)
-    console.log('🔍 Verifying Resend API connection...');
-    console.log('✅ Resend Email Service is ready');
-    return true;
-  } catch (error) {
-    console.error('❌ Resend Connection Error:', error.message);
-    return false;
+// Verify transporter configuration
+transporter.verify(function (error, success) {
+  if (error) {
+    console.error('❌ SMTP Connection Error:', error.message);
+  } else {
+    console.log('✅ SMTP Server is ready to send emails');
   }
-};
-
-// Initialize verification
-verifyResendConnection();
+});
 
 // ✅ Send Registration OTP
 const sendRegistrationOTP = async (email, username, otp) => {
-  const emailOptions = {
+  const message = {
     from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
     to: email,
     subject: 'Verify Your Email - NomadNet',
@@ -54,8 +34,6 @@ const sendRegistrationOTP = async (email, username, otp) => {
       <!DOCTYPE html>
       <html>
       <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background: #f4f4f4; }
@@ -75,9 +53,8 @@ const sendRegistrationOTP = async (email, username, otp) => {
           .warning-text { color: #856404; font-size: 14px; }
           .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px; }
           .footer-text { margin: 5px 0; }
+          .footer-link { color: #667eea; text-decoration: none; }
           .divider { height: 1px; background: linear-gradient(to right, transparent, #ddd, transparent); margin: 20px 0; }
-          .feature-list { color: #666; margin-left: 20px; margin-bottom: 20px; }
-          .feature-list li { padding: 5px 0; }
         </style>
       </head>
       <body>
@@ -114,7 +91,7 @@ const sendRegistrationOTP = async (email, username, otp) => {
             <p class="message">
               Once verified, you'll be able to:
             </p>
-            <ul class="feature-list">
+            <ul style="color: #666; margin-left: 20px; margin-bottom: 20px;">
               <li>Connect with fellow nomads</li>
               <li>Share your travel experiences</li>
               <li>Discover amazing locations</li>
@@ -145,12 +122,12 @@ Never share this OTP with anyone.
     `
   };
 
-  return await sendEmailWithRetry(emailOptions);
+  await transporter.sendMail(message);
 };
 
 // ✅ Send Password Reset OTP
 const sendPasswordResetOTP = async (email, username, otp) => {
-  const emailOptions = {
+  const message = {
     from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
     to: email,
     subject: 'Password Reset Request - NomadNet',
@@ -158,15 +135,12 @@ const sendPasswordResetOTP = async (email, username, otp) => {
       <!DOCTYPE html>
       <html>
       <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background: #f4f4f4; }
           .email-container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
           .header { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 40px 20px; text-align: center; }
           .header h1 { font-size: 28px; margin-bottom: 10px; }
-          .header p { font-size: 14px; opacity: 0.9; }
           .content { padding: 40px 30px; background: white; }
           .greeting { font-size: 18px; color: #333; margin-bottom: 20px; }
           .message { color: #666; margin-bottom: 30px; line-height: 1.8; }
@@ -178,7 +152,6 @@ const sendPasswordResetOTP = async (email, username, otp) => {
           .warning-title { font-weight: bold; color: #856404; margin-bottom: 5px; }
           .warning-text { color: #856404; font-size: 14px; }
           .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-          .footer-text { margin: 5px 0; }
           .divider { height: 1px; background: linear-gradient(to right, transparent, #ddd, transparent); margin: 20px 0; }
         </style>
       </head>
@@ -236,12 +209,12 @@ If you didn't request this, please ignore this email.
     `
   };
 
-  return await sendEmailWithRetry(emailOptions);
+  await transporter.sendMail(message);
 };
 
 // ✅ Send Password Change OTP
 const sendPasswordChangeOTP = async (email, username, otp) => {
-  const emailOptions = {
+  const message = {
     from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
     to: email,
     subject: 'Verify Password Change - NomadNet',
@@ -249,15 +222,12 @@ const sendPasswordChangeOTP = async (email, username, otp) => {
       <!DOCTYPE html>
       <html>
       <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background: #f4f4f4; }
           .email-container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
           .header { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 40px 20px; text-align: center; }
           .header h1 { font-size: 28px; margin-bottom: 10px; }
-          .header p { font-size: 14px; opacity: 0.9; }
           .content { padding: 40px 30px; background: white; }
           .greeting { font-size: 18px; color: #333; margin-bottom: 20px; }
           .message { color: #666; margin-bottom: 30px; line-height: 1.8; }
@@ -266,7 +236,6 @@ const sendPasswordChangeOTP = async (email, username, otp) => {
           .otp-code { font-size: 36px; font-weight: bold; color: #d63031; letter-spacing: 8px; margin: 15px 0; font-family: 'Courier New', monospace; }
           .otp-validity { font-size: 12px; color: #999; margin-top: 10px; }
           .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-          .footer-text { margin: 5px 0; }
         </style>
       </head>
       <body>
@@ -310,12 +279,12 @@ This code is valid for 10 minutes.
     `
   };
 
-  return await sendEmailWithRetry(emailOptions);
+  await transporter.sendMail(message);
 };
 
 // ✅ Send Welcome Email
 const sendWelcomeEmail = async (email, username) => {
-  const emailOptions = {
+  const message = {
     from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
     to: email,
     subject: 'Welcome to NomadNet! 🎉',
@@ -323,8 +292,6 @@ const sendWelcomeEmail = async (email, username) => {
       <!DOCTYPE html>
       <html>
       <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background: #f4f4f4; }
@@ -335,14 +302,12 @@ const sendWelcomeEmail = async (email, username) => {
           .message { color: #666; margin-bottom: 20px; line-height: 1.8; font-size: 16px; }
           .features { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
           .features h3 { color: #667eea; margin-bottom: 15px; }
-          .features ul { list-style: none; padding: 0; }
+          .features ul { list-style: none; }
           .features li { padding: 8px 0; color: #666; }
           .features li:before { content: "✓ "; color: #667eea; font-weight: bold; margin-right: 10px; }
           .cta { text-align: center; margin: 30px 0; }
           .cta-button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 50px; font-weight: bold; }
           .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-          .footer-text { margin: 5px 0; }
-          .highlight { color: #667eea; font-weight: bold; }
         </style>
       </head>
       <body>
@@ -373,7 +338,7 @@ const sendWelcomeEmail = async (email, username) => {
               Ready to start your adventure? Login to your account and complete your profile to get the most out of NomadNet!
             </p>
             
-            <p class="message highlight">
+            <p class="message" style="color: #667eea; font-weight: bold;">
               Happy travels! ✈️🌍
             </p>
           </div>
@@ -406,7 +371,7 @@ Happy travels! ✈️🌍
     `
   };
 
-  return await sendEmailWithRetry(emailOptions);
+  await transporter.sendMail(message);
 };
 
 // ✅ Send Marketplace Request Notification
@@ -420,7 +385,7 @@ const sendMarketplaceRequestEmail = async (
   message,
   listingId
 ) => {
-  const emailOptions = {
+  const emailMessage = {
     from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
     to: ownerEmail,
     subject: `New Request for Your ${listingType.charAt(0).toUpperCase() + listingType.slice(1)} - ${listingTitle}`,
@@ -428,21 +393,18 @@ const sendMarketplaceRequestEmail = async (
       <!DOCTYPE html>
       <html>
       <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background: #f4f4f4; }
           .email-container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
           .header { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 40px 20px; text-align: center; }
           .header h1 { font-size: 28px; margin-bottom: 10px; }
-          .header p { font-size: 14px; opacity: 0.9; }
           .content { padding: 40px 30px; background: white; }
           .greeting { font-size: 18px; color: #333; margin-bottom: 20px; }
           .message { color: #666; margin-bottom: 20px; line-height: 1.8; }
           .listing-box { background: #f8f9fa; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #11998e; }
           .listing-title { font-size: 20px; font-weight: bold; color: #11998e; margin-bottom: 10px; }
-          .listing-type { display: inline-block; background: #11998e; color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; margin-bottom: 15px; text-transform: uppercase; }
+          .listing-type { display: inline-block; background: #11998e; color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; margin-bottom: 15px; }
           .requester-message { background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 15px 0; }
           .message-label { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 5px; }
           .message-content { color: #333; font-style: italic; }
@@ -451,7 +413,6 @@ const sendMarketplaceRequestEmail = async (
           .cta { text-align: center; margin: 30px 0; }
           .cta-button { display: inline-block; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 50px; font-weight: bold; }
           .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-          .footer-text { margin: 5px 0; }
         </style>
       </head>
       <body>
@@ -469,7 +430,7 @@ const sendMarketplaceRequestEmail = async (
             </p>
             
             <div class="listing-box">
-              <div class="listing-type">${listingType}</div>
+              <div class="listing-type">${listingType.toUpperCase()}</div>
               <div class="listing-title">${listingTitle}</div>
               
               <div class="requester-info">
@@ -517,15 +478,14 @@ Visit: ${process.env.CLIENT_URL}/marketplace/my-listings
     `
   };
 
-  return await sendEmailWithRetry(emailOptions);
+  await transporter.sendMail(emailMessage);
 };
 
-// Export all functions
+// Add to exports
 module.exports = {
   sendRegistrationOTP,
   sendPasswordResetOTP,
   sendPasswordChangeOTP,
   sendWelcomeEmail,
-  sendMarketplaceRequestEmail,
-  verifyResendConnection
+  sendMarketplaceRequestEmail
 };
