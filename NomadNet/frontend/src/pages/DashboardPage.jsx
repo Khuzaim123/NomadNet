@@ -13,7 +13,6 @@ const DashboardPage = () => {
   const [locationError, setLocationError] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // Map data
   const [nearbyData, setNearbyData] = useState({
     users: [],
     venues: [],
@@ -21,7 +20,6 @@ const DashboardPage = () => {
     checkIns: []
   });
 
-  // Filters
   const [filters, setFilters] = useState({
     users: true,
     venues: true,
@@ -29,9 +27,7 @@ const DashboardPage = () => {
     checkIns: true
   });
   
-  const [radius, setRadius] = useState(1000); // 1km default
-
-  // Selected marker for detail drawer
+  const [radius, setRadius] = useState(1000);
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -52,8 +48,6 @@ const DashboardPage = () => {
         (error) => {
           console.error('❌ Location error:', error.message);
           setLocationError(error.message);
-          
-          // Fallback to default location (e.g., New York)
           setUserLocation({ longitude: -74.006, latitude: 40.7128 });
           setLoading(false);
         },
@@ -64,14 +58,13 @@ const DashboardPage = () => {
         }
       );
     } else {
-      console.error('❌ Geolocation not supported');
       setLocationError('Geolocation not supported');
       setUserLocation({ longitude: -74.006, latitude: 40.7128 });
       setLoading(false);
     }
   }, []);
 
-  // Fetch nearby data when location is available
+  // Fetch nearby data
   useEffect(() => {
     if (!userLocation) return;
 
@@ -81,6 +74,7 @@ const DashboardPage = () => {
         
         const types = Object.keys(filters)
           .filter(key => filters[key])
+          .map(key => key === 'checkIns' ? 'checkins' : key)
           .join(',');
 
         const data = await getNearbyAll(
@@ -101,7 +95,7 @@ const DashboardPage = () => {
     fetchNearbyData();
   }, [userLocation, radius, filters]);
 
-  // Connect to Socket.IO for real-time updates
+  // Connect to Socket.IO
   useEffect(() => {
     if (!userLocation) return;
 
@@ -112,25 +106,40 @@ const DashboardPage = () => {
     }
 
     console.log('🔌 Connecting to Socket.IO...');
-    socketService.connect(token);
+    const socket = socketService.connect(token);
 
-    // Join map area
-    socketService.joinMapArea(
-      userLocation.longitude,
-      userLocation.latitude,
-      radius
-    );
+    if (!socket) {
+      console.warn('⚠️ Socket connection failed');
+      return;
+    }
 
-    // Listen for real-time events
-    socketService.on('map:checkin-created', (data) => {
+    // Wait for connection then join map area
+    const handleConnect = () => {
+      console.log('✅ Socket connected, joining map area...');
+      socketService.joinMapArea(
+        userLocation.longitude,
+        userLocation.latitude,
+        radius
+      );
+    };
+
+    // If already connected
+    if (socketService.isConnected()) {
+      handleConnect();
+    }
+
+    // Listen for socket events directly on the socket instance
+    socket.on('connect', handleConnect);
+
+    socket.on('map:checkin-created', (data) => {
       console.log('📍 New check-in:', data);
       setNearbyData(prev => ({
         ...prev,
-        checkIns: [...prev.checkIns, data.data]
+        checkIns: [...prev.checkIns, data.data || data]
       }));
     });
 
-    socketService.on('map:checkin-deleted', (data) => {
+    socket.on('map:checkin-deleted', (data) => {
       console.log('🗑️ Check-in deleted:', data.checkInId);
       setNearbyData(prev => ({
         ...prev,
@@ -138,7 +147,7 @@ const DashboardPage = () => {
       }));
     });
 
-    socketService.on('map:checkin-expired', (data) => {
+    socket.on('map:checkin-expired', (data) => {
       console.log('⏰ Check-in expired:', data.checkInId);
       setNearbyData(prev => ({
         ...prev,
@@ -146,25 +155,24 @@ const DashboardPage = () => {
       }));
     });
 
-    socketService.on('map:marketplace-created', (data) => {
+    socket.on('map:marketplace-created', (data) => {
       console.log('🛍️ New marketplace item:', data);
       setNearbyData(prev => ({
         ...prev,
-        marketplace: [...prev.marketplace, data.data]
+        marketplace: [...prev.marketplace, data.data || data]
       }));
     });
 
-    socketService.on('map:venue-created', (data) => {
+    socket.on('map:venue-created', (data) => {
       console.log('🏢 New venue:', data);
       setNearbyData(prev => ({
         ...prev,
-        venues: [...prev.venues, data.data]
+        venues: [...prev.venues, data.data || data]
       }));
     });
 
-    socketService.on('map:user-entered', (data) => {
+    socket.on('map:user-entered', (data) => {
       console.log('👤 User entered area:', data);
-      // Add user to map if not already present
       setNearbyData(prev => {
         const exists = prev.users.some(u => u._id === data.userId);
         if (exists) return prev;
@@ -184,7 +192,7 @@ const DashboardPage = () => {
       });
     });
 
-    socketService.on('map:user-left', (data) => {
+    socket.on('map:user-left', (data) => {
       console.log('👋 User left area:', data.userId);
       setNearbyData(prev => ({
         ...prev,
@@ -192,10 +200,30 @@ const DashboardPage = () => {
       }));
     });
 
+    socket.on('map:location-updated', (data) => {
+      console.log('📍 User location updated:', data);
+      setNearbyData(prev => ({
+        ...prev,
+        users: prev.users.map(u => 
+          u._id === data.userId 
+            ? { ...u, location: data.location }
+            : u
+        )
+      }));
+    });
+
     // Cleanup
     return () => {
-      console.log('🔌 Disconnecting socket...');
-      socketService.disconnect();
+      console.log('🔌 Cleaning up socket listeners...');
+      socket.off('connect', handleConnect);
+      socket.off('map:checkin-created');
+      socket.off('map:checkin-deleted');
+      socket.off('map:checkin-expired');
+      socket.off('map:marketplace-created');
+      socket.off('map:venue-created');
+      socket.off('map:user-entered');
+      socket.off('map:user-left');
+      socket.off('map:location-updated');
     };
   }, [userLocation, radius]);
 
@@ -220,8 +248,7 @@ const DashboardPage = () => {
   const handleRadiusChange = (newRadius) => {
     setRadius(newRadius);
     
-    // Rejoin map area with new radius
-    if (userLocation) {
+    if (userLocation && socketService.isConnected()) {
       socketService.joinMapArea(
         userLocation.longitude,
         userLocation.latitude,
@@ -239,29 +266,24 @@ const DashboardPage = () => {
     );
   }
 
-  if (locationError) {
-    return (
-      <div className="dashboard-error">
-        <div className="error-icon">⚠️</div>
-        <h2>Location Access Required</h2>
-        <p>{locationError}</p>
-        <p>Using default location (New York). Please enable location services for better experience.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="dashboard-page">
+      {locationError && (
+        <div className="location-warning">
+          ⚠️ Using default location. Enable location services for accurate results.
+        </div>
+      )}
+
       <FilterPanel
         filters={filters}
         radius={radius}
         onFilterChange={handleFilterChange}
         onRadiusChange={handleRadiusChange}
         summary={{
-          users: nearbyData.users.length,
-          venues: nearbyData.venues.length,
-          marketplace: nearbyData.marketplace.length,
-          checkIns: nearbyData.checkIns.length
+          users: nearbyData.users?.length || 0,
+          venues: nearbyData.venues?.length || 0,
+          marketplace: nearbyData.marketplace?.length || 0,
+          checkIns: nearbyData.checkIns?.length || 0
         }}
       />
 
