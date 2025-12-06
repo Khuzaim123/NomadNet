@@ -379,6 +379,7 @@ app.use('/api/conversations', require('./src/routes/conversationRoutes'));
 app.use('/api/messages', require('./src/routes/messageRoutes'));
 app.use('/api/statuses', require('./src/routes/statusRoutes'));
 app.use('/api/marketplace', require('./src/routes/marketplaceRoutes'));
+app.use('/api/map', require('./src/routes/mapRoutes'));
 
 // ======================
 // HEALTH CHECK
