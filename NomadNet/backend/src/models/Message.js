@@ -23,14 +23,13 @@ const MessageSchema = new mongoose.Schema(
 
     content: {
       type: String,
-      required: [true, 'Message content is required'],
       trim: true,
     },
 
     // Your schema originally had `type`. Keep it and map controller's messageType to this
     type: {
       type: String,
-      enum: ['text', 'image', 'location'],
+      enum: ['text', 'image', 'location', 'marketplace', 'venue', 'checkin'],
       default: 'text',
     },
 
@@ -42,9 +41,34 @@ const MessageSchema = new mongoose.Schema(
       type: {
         type: String,
         enum: ['Point'],
+        default: undefined  // Don't create this field if not provided
       },
-      coordinates: [Number],
-      name: String,
+      coordinates: {
+        type: [Number],
+        default: undefined  // Don't create empty array if not provided
+      },
+      name: {
+        type: String,
+        default: undefined
+      }
+    },
+
+    // ✅ NEW: Reference to marketplace item when sharing an offer
+    marketplaceItem: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MarketplaceItem',
+    },
+
+    // ✅ NEW: Reference to venue when sharing a location
+    venue: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Venue',
+    },
+
+    // ✅ NEW: Reference to check-in when sharing user's current location
+    checkIn: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CheckIn',
     },
 
     // ✅ ADD: attachments (optional)
@@ -100,6 +124,29 @@ const MessageSchema = new mongoose.Schema(
 // Indexes
 MessageSchema.index({ conversation: 1, createdAt: -1 });
 MessageSchema.index({ sender: 1, createdAt: -1 });
+
+// Validation: Content is required for text messages
+MessageSchema.pre('save', function (next) {
+  if (this.type === 'text' && (!this.content || this.content.trim() === '')) {
+    next(new Error('Content is required for text messages'));
+  } else {
+    next();
+  }
+});
+
+// ✅ Validation: Ensure proper references for new message types
+MessageSchema.pre('save', function (next) {
+  if (this.type === 'marketplace' && !this.marketplaceItem) {
+    return next(new Error('Marketplace message must have a marketplaceItem reference'));
+  }
+  if (this.type === 'venue' && !this.venue) {
+    return next(new Error('Venue message must have a venue reference'));
+  }
+  if (this.type === 'checkin' && !this.checkIn) {
+    return next(new Error('Check-in message must have a checkIn reference'));
+  }
+  next();
+});
 
 // Update conversation's lastMessage when new message is created
 MessageSchema.post('save', async function () {

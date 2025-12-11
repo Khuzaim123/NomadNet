@@ -1,15 +1,16 @@
 // src/components/chat/ChatWindow.jsx
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useChat } from '../../context/ChatContext';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
+import MessageTypeMenu from './MessageTypeMenu';
 import LoadingSpinner from '../LoadingSpinner';
-import { 
-  getOtherParticipant, 
-  getUserDisplayName, 
+import {
+  getOtherParticipant,
+  getUserDisplayName,
   getUserAvatar,
-  getUserId 
+  getUserId
 } from '../../utils/helpers';
 import { groupMessagesByDate } from '../../utils/dateFormat';
 import { getUser } from '../../services/authService';
@@ -30,6 +31,8 @@ const ChatWindow = () => {
     isConnected,
   } = useChat();
 
+  const [showMessageTypeMenu, setShowMessageTypeMenu] = useState(false);
+
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const prevMessagesLengthRef = useRef(0);
@@ -37,8 +40,8 @@ const ChatWindow = () => {
   // Scroll to bottom when new messages arrive
   const scrollToBottom = useCallback((smooth = true) => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
-        behavior: smooth ? 'smooth' : 'auto' 
+      messagesEndRef.current.scrollIntoView({
+        behavior: smooth ? 'smooth' : 'auto'
       });
     }
   }, []);
@@ -123,6 +126,77 @@ const ChatWindow = () => {
       });
     } catch (error) {
       console.error('Failed to send message:', error);
+    }
+  };
+
+  const handleSendSpecialMessage = async (type, data) => {
+    if (!otherUserId) return;
+
+    try {
+      console.log('🔍 handleSendSpecialMessage - type:', type);
+      console.log('🔍 handleSendSpecialMessage - data:', JSON.stringify(data, null, 2));
+
+      const messageData = {
+        conversationId: activeConversation._id,
+        receiverId: otherUserId,
+        content: data.content || '',
+        messageType: type,
+      };
+
+      console.log('📦 messageData before switch:', messageData);
+
+      // Add type-specific data
+      switch (type) {
+        case 'image':
+          messageData.imageUrl = data.imageUrl;
+          messageData.content = data.caption || ''; // Use caption as content
+          break;
+        case 'marketplace_item':
+          messageData.messageType = 'marketplace';
+          messageData.marketplaceItemId = data.marketplaceItemId;
+          break;
+        case 'venue':
+          messageData.venueId = data.venueId;
+          break;
+        case 'checkin':
+          console.log('📍 Check-in case entered');
+          console.log('  - data.checkInId:', data.checkInId);
+          console.log('  - data.coordinates:', data.coordinates);
+
+          // If we don't have a checkInId yet, create the check-in first
+          if (!data.checkInId && data.coordinates) {
+            console.log('🆕 Creating new check-in with coordinates...');
+            const { createCheckIn } = await import('../../services/checkInService');
+            const checkInData = {
+              longitude: data.coordinates[0],
+              latitude: data.coordinates[1],
+              address: data.address,
+              note: data.note,
+              venueId: data.venueId
+            };
+
+            console.log('📤 checkInData:', checkInData);
+            const checkInResponse = await createCheckIn(checkInData);
+            console.log('📥 checkInResponse:', checkInResponse);
+
+            const checkInId = checkInResponse.data?._id || checkInResponse.data?.checkIn?._id;
+            console.log('✅ Extracted checkInId:', checkInId);
+            messageData.checkInId = checkInId;
+          } else {
+            console.log('✅ Using provided checkInId:', data.checkInId);
+            messageData.checkInId = data.checkInId;
+          }
+
+          console.log('📦 messageData.checkInId set to:', messageData.checkInId);
+          break;
+        case 'location':
+          messageData.location = data.location;
+          break;
+      }
+
+      await sendMessage(messageData);
+    } catch (error) {
+      console.error('Failed to send special message:', error);
     }
   };
 
@@ -274,15 +348,28 @@ const ChatWindow = () => {
         onSend={handleSendMessage}
         onTyping={handleTyping}
         onStopTyping={handleStopTyping}
+        onAttachClick={() => setShowMessageTypeMenu(true)}
         disabled={messagesLoading || !isConnected}
         placeholder={
-          !isConnected 
+          !isConnected
             ? 'Connecting...'
             : listingContext
               ? `Message about "${listingContext.title}"...`
               : `Message ${otherUserName}...`
         }
       />
+
+
+      {/* Message Type Menu Modal - Triggered by + button in MessageInput */}
+      {showMessageTypeMenu && (
+        <MessageTypeMenu
+          onClose={() => setShowMessageTypeMenu(false)}
+          onSelect={(type, data) => {
+            handleSendSpecialMessage(type, data);
+            setShowMessageTypeMenu(false);
+          }}
+        />
+      )}
     </>
   );
 };

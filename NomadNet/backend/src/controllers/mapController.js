@@ -523,6 +523,361 @@ const getCheckInDetails = async (req, res) => {
   }
 };
 
+// @desc    Get user's current location
+// @route   GET /api/map/my-location
+// @access  Private
+const getMyLocation = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('currentLocation currentCity currentCountry lastActive shareLocation');
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    if (!user.currentLocation || !user.currentLocation.coordinates) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Location not set. Please update your location first.'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      data: {
+        location: {
+          type: user.currentLocation.type,
+          coordinates: user.currentLocation.coordinates,
+          longitude: user.currentLocation.coordinates[0],
+          latitude: user.currentLocation.coordinates[1]
+        },
+        currentCity: user.currentCity,
+        currentCountry: user.currentCountry,
+        shareLocation: user.shareLocation,
+        lastActive: user.lastActive
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get my location error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// @desc    Update user's current location
+// @route   PUT /api/map/my-location
+// @access  Private
+const updateMyLocation = async (req, res) => {
+  try {
+    const { longitude, latitude, city, country } = req.body;
+
+    // Validate coordinates
+    if (!longitude || !latitude) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide longitude and latitude'
+      });
+    }
+
+    const lng = parseFloat(longitude);
+    const lat = parseFloat(latitude);
+
+    // Validate coordinate ranges
+    if (lng < -180 || lng > 180) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Longitude must be between -180 and 180'
+      });
+    }
+
+    if (lat < -90 || lat > 90) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Latitude must be between -90 and 90'
+      });
+    }
+
+    // Build update object
+    const updateData = {
+      currentLocation: {
+        type: 'Point',
+        coordinates: [lng, lat]
+      },
+      lastActive: new Date()
+    };
+
+    // Add city and country if provided
+    if (city) updateData.currentCity = city;
+    if (country) updateData.currentCountry = country;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      updateData,
+      { new: true }
+    ).select('currentLocation currentCity currentCountry lastActive shareLocation');
+
+    console.log(`📍 Location updated for user ${req.user._id}: [${lng}, ${lat}]`);
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    if (io) {
+      const gridRoom = `map:${Math.floor(lat)}:${Math.floor(lng)}`;
+      io.to(gridRoom).emit('map:user-location-updated', {
+        userId: req.user._id,
+        username: req.user.username,
+        displayName: req.user.displayName,
+        location: {
+          type: 'Point',
+          coordinates: [lng, lat]
+        }
+      });
+    }
+
+    res.json({
+      status: 'success',
+      message: 'Location updated successfully',
+      data: {
+        location: {
+          type: user.currentLocation.type,
+          coordinates: user.currentLocation.coordinates,
+          longitude: user.currentLocation.coordinates[0],
+          latitude: user.currentLocation.coordinates[1]
+        },
+        currentCity: user.currentCity,
+        currentCountry: user.currentCountry,
+        shareLocation: user.shareLocation,
+        lastActive: user.lastActive
+      }
+    });
+  } catch (error) {
+    console.error('❌ Update my location error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// @desc    Toggle location sharing
+// @route   PATCH /api/map/share-location
+// @access  Private
+const toggleShareLocation = async (req, res) => {
+  try {
+    const { shareLocation } = req.body;
+
+    if (typeof shareLocation !== 'boolean') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'shareLocation must be a boolean (true or false)'
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { shareLocation },
+      { new: true }
+    ).select('shareLocation');
+
+    console.log(`📍 Share location ${shareLocation ? 'enabled' : 'disabled'} for user ${req.user._id}`);
+
+    res.json({
+      status: 'success',
+      message: `Location sharing ${shareLocation ? 'enabled' : 'disabled'}`,
+      data: {
+        shareLocation: user.shareLocation
+      }
+    });
+  } catch (error) {
+    console.error('❌ Toggle share location error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// @desc    Get another user's location (if they share it)
+// @route   GET /api/map/user/:userId/location
+// @access  Private
+const getUserLocation = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { longitude, latitude } = req.query;
+
+    const user = await User.findById(userId)
+      .select('username displayName avatar currentLocation currentCity currentCountry shareLocation isOnline lastActive blockedUsers visibility');
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Check if blocked
+    if (user.blockedUsers && user.blockedUsers.includes(req.user._id)) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'You cannot view this user\'s location'
+      });
+    }
+
+    // Check if user shares location
+    if (!user.shareLocation) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'This user has disabled location sharing'
+      });
+    }
+
+    // Check visibility
+    if (user.visibility === 'private') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'This user\'s profile is private'
+      });
+    }
+
+    // Check if location exists
+    if (!user.currentLocation || !user.currentLocation.coordinates) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'This user has not set their location'
+      });
+    }
+
+    // Calculate distance if requester's coordinates provided
+    let distance = null;
+    let distanceFormatted = null;
+
+    if (longitude && latitude) {
+      const lng = parseFloat(longitude);
+      const lat = parseFloat(latitude);
+
+      if (!isNaN(lng) && !isNaN(lat)) {
+        distance = Math.round(
+          calculateDistance([lng, lat], user.currentLocation.coordinates)
+        );
+        distanceFormatted = formatDistance(distance);
+      }
+    }
+
+    res.json({
+      status: 'success',
+      data: {
+        user: {
+          _id: user._id,
+          username: user.username,
+          displayName: user.displayName,
+          avatar: user.avatar,
+          isOnline: user.isOnline,
+          lastActive: user.lastActive
+        },
+        location: {
+          type: user.currentLocation.type,
+          coordinates: user.currentLocation.coordinates,
+          longitude: user.currentLocation.coordinates[0],
+          latitude: user.currentLocation.coordinates[1]
+        },
+        currentCity: user.currentCity,
+        currentCountry: user.currentCountry,
+        distance,
+        distanceFormatted
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get user location error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// @desc    Get multiple users' locations
+// @route   POST /api/map/users/locations
+// @access  Private
+const getMultipleUsersLocations = async (req, res) => {
+  try {
+    const { userIds, longitude, latitude } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide an array of userIds'
+      });
+    }
+
+    // Limit to 50 users at a time
+    const limitedUserIds = userIds.slice(0, 50);
+
+    const users = await User.find({
+      _id: { $in: limitedUserIds },
+      shareLocation: true,
+      visibility: { $in: ['public', 'connections'] },
+      blockedUsers: { $nin: [req.user._id] }
+    }).select('username displayName avatar currentLocation currentCity currentCountry isOnline lastActive');
+
+    const usersWithDistance = users
+      .filter(user => user.currentLocation && user.currentLocation.coordinates)
+      .map(user => {
+        let distance = null;
+        let distanceFormatted = null;
+
+        if (longitude && latitude) {
+          const lng = parseFloat(longitude);
+          const lat = parseFloat(latitude);
+
+          if (!isNaN(lng) && !isNaN(lat)) {
+            distance = Math.round(
+              calculateDistance([lng, lat], user.currentLocation.coordinates)
+            );
+            distanceFormatted = formatDistance(distance);
+          }
+        }
+
+        return {
+          _id: user._id,
+          username: user.username,
+          displayName: user.displayName,
+          avatar: user.avatar,
+          isOnline: user.isOnline,
+          lastActive: user.lastActive,
+          location: {
+            type: user.currentLocation.type,
+            coordinates: user.currentLocation.coordinates,
+            longitude: user.currentLocation.coordinates[0],
+            latitude: user.currentLocation.coordinates[1]
+          },
+          currentCity: user.currentCity,
+          currentCountry: user.currentCountry,
+          distance,
+          distanceFormatted
+        };
+      });
+
+    res.json({
+      status: 'success',
+      data: {
+        users: usersWithDistance,
+        count: usersWithDistance.length,
+        requested: limitedUserIds.length
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get multiple users locations error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
 // ======================
 // 📤 Exports
 // ======================
@@ -531,5 +886,10 @@ module.exports = {
   getUserDetails,
   getVenueDetails,
   getMarketplaceDetails,
-  getCheckInDetails
+  getCheckInDetails,
+  getMyLocation,           // ✅ NEW
+  updateMyLocation,        // ✅ NEW
+  toggleShareLocation,     // ✅ NEW
+  getUserLocation,         // ✅ NEW
+  getMultipleUsersLocations // ✅ NEW
 };

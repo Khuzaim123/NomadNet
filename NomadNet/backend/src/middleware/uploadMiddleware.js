@@ -1,14 +1,13 @@
 const multer = require('multer');
 const path = require('path');
 
+// Use memory storage - we'll upload to Cloudinary manually
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  // ✅ ADD DEBUGGING
   console.log('📁 File upload attempt:');
   console.log('   - Original name:', file.originalname);
   console.log('   - Mimetype:', file.mimetype);
-  console.log('   - Size:', file.size);
 
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -29,7 +28,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024 // 5MB
   },
   fileFilter: fileFilter
 });

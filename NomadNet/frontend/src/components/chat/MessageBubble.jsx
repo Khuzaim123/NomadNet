@@ -1,5 +1,6 @@
 // src/components/chat/MessageBubble.jsx
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { formatMessageTimestamp } from '../../utils/dateFormat';
 import { getUserDisplayName, getUserAvatar, getUserId, isSameUser } from '../../utils/helpers';
 
@@ -28,6 +29,251 @@ const MessageBubble = ({ message, currentUserId, onDelete }) => {
     setShowMenu(false);
   };
 
+  // Render message content based on type
+  const renderMessageContent = () => {
+    const { type, content, imageUrl, marketplaceItem, venue, checkIn } = message;
+
+    switch (type) {
+      case 'image':
+        console.log('🖼️ Rendering image message:', { type, imageUrl, content });
+        return (
+          <>
+            {imageUrl && (
+              <img
+                src={imageUrl}
+                alt="Message attachment"
+                className="message-image"
+                style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '8px' }}
+              />
+            )}
+            {content && <p className="message-text">{content}</p>}
+          </>
+        );
+
+      case 'marketplace':
+        return marketplaceItem ? (
+          <div className="message-marketplace" style={{ padding: '8px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.1)' }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {marketplaceItem.photos && marketplaceItem.photos[0] && (
+                <img
+                  src={marketplaceItem.photos[0]}
+                  alt={marketplaceItem.title}
+                  style={{ width: '80px', height: '80px', borderRadius: '6px', objectFit: 'cover' }}
+                />
+              )}
+              <div style={{ flex: 1 }}>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600' }}>
+                  {marketplaceItem.title}
+                </h4>
+                <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#666', textTransform: 'capitalize' }}>
+                  {marketplaceItem.type} • {marketplaceItem.category?.replace(/_/g, ' ')}
+                </p>
+                {marketplaceItem.priceType === 'paid' && marketplaceItem.price && (
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#6366f1' }}>
+                    ${marketplaceItem.price.amount} {marketplaceItem.price.currency}
+                  </p>
+                )}
+                {marketplaceItem.priceType === 'free' && (
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#10b981' }}>
+                    Free
+                  </p>
+                )}
+              </div>
+            </div>
+            {content && <p className="message-text" style={{ marginTop: '8px' }}>{content}</p>}
+            <Link
+              to={`/marketplace/${marketplaceItem._id}`}
+              style={{ display: 'block', marginTop: '8px', fontSize: '12px', color: '#6366f1' }}
+            >
+              View Item →
+            </Link>
+          </div>
+        ) : (
+          <p className="message-text">{content || 'Shared a marketplace item'}</p>
+        );
+
+      case 'venue':
+        return venue ? (
+          <div className="message-venue" style={{ padding: '8px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)' }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {venue.photos && venue.photos[0] && (
+                <img
+                  src={typeof venue.photos[0] === 'string' ? venue.photos[0] : venue.photos[0].url}
+                  alt={venue.name}
+                  style={{ width: '80px', height: '80px', borderRadius: '6px', objectFit: 'cover' }}
+                />
+              )}
+              <div style={{ flex: 1 }}>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600' }}>
+                  📍 {venue.name}
+                </h4>
+                <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#666', textTransform: 'capitalize' }}>
+                  {venue.category?.replace(/_/g, ' ')}
+                </p>
+                {venue.address?.formatted && (
+                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+                    {venue.address.formatted}
+                  </p>
+                )}
+              </div>
+            </div>
+            {content && <p className="message-text" style={{ marginTop: '8px' }}>{content}</p>}
+            <Link
+              to={`/venues/${venue._id}`}
+              style={{ display: 'block', marginTop: '8px', fontSize: '12px', color: '#10b981' }}
+            >
+              View Venue →
+            </Link>
+          </div>
+        ) : (
+          <p className="message-text">{content || 'Shared a venue'}</p>
+        );
+
+      case 'checkin':
+        const openCheckInInMaps = () => {
+          if (checkIn?.location?.coordinates) {
+            const [lng, lat] = checkIn.location.coordinates;
+            window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+          }
+        };
+
+        return checkIn ? (
+          <div
+            className="message-checkin"
+            onClick={openCheckInInMaps}
+            style={{
+              padding: '8px',
+              borderRadius: '8px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              cursor: checkIn?.location?.coordinates ? 'pointer' : 'default',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => checkIn?.location?.coordinates && (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)')}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+          >
+            <div>
+              <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600' }}>
+                ✅ Checked in {checkIn?.location?.coordinates && '🗺️'}
+              </h4>
+              {checkIn.venue && (
+                <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#666' }}>
+                  at {checkIn.venue.name || 'a location'}
+                </p>
+              )}
+              {checkIn.address && (
+                <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#999' }}>
+                  📍 {checkIn.address}
+                </p>
+              )}
+              {checkIn.note && (
+                <p style={{ margin: '8px 0 0', fontSize: '13px', fontStyle: 'italic' }}>
+                  "{checkIn.note}"
+                </p>
+              )}
+              {checkIn?.location?.coordinates && (
+                <p style={{ margin: '8px 0 0', fontSize: '11px', color: '#ef4444', fontWeight: '500' }}>
+                  Click to open in Google Maps →
+                </p>
+              )}
+            </div>
+            {content && <p className="message-text" style={{ marginTop: '8px' }}>{content}</p>}
+          </div>
+        ) : (
+          <p className="message-text">{content || 'Shared a check-in'}</p>
+        );
+
+      case 'location':
+        console.log('📍 LOCATION DEBUG:', JSON.stringify(message, null, 2));
+
+        const handleLocationClick = () => {
+          console.log('🖱️ Location clicked!');
+          const coords = message.location?.coordinates;
+          console.log('Coordinates:', coords);
+
+          if (coords && coords.length === 2) {
+            const [lng, lat] = coords;
+            const url = `https://www.google.com/maps?q=${lat},${lng}`;
+            console.log('Opening:', url);
+            window.open(url, '_blank');
+          } else {
+            alert('Location coordinates not available');
+          }
+        };
+
+        const locationCoords = message.location?.coordinates;
+        const locationName = message.location?.name || content || 'Shared location';
+
+        return (
+          <div
+            className="message-location"
+            onClick={handleLocationClick}
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              background: 'rgba(245, 158, 11, 0.1)',
+              cursor: 'pointer',
+              border: '1px solid rgba(245, 158, 11, 0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(245, 158, 11, 0.15)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div>
+              <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600' }}>
+                📍 Location Shared
+              </h4>
+              {locationName && (
+                <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#666' }}>
+                  {locationName}
+                </p>
+              )}
+              {locationCoords && locationCoords.length === 2 && (
+                <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+                  {typeof locationCoords[1] === 'number' ? locationCoords[1].toFixed(5) : locationCoords[1]}, {typeof locationCoords[0] === 'number' ? locationCoords[0].toFixed(5) : locationCoords[0]}
+                </p>
+              )}
+              {!locationCoords && (
+                <p style={{ margin: 0, fontSize: '12px', color: '#f59e0b' }}>
+                  ⚠️ Coordinates not available
+                </p>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'text':
+      default:
+        return (
+          <>
+            {/* Message Image if exists (legacy support) */}
+            {message.image && (
+              <img
+                src={message.image}
+                alt="Message attachment"
+                className="message-image"
+              />
+            )}
+
+            {/* Message Text */}
+            {content && (
+              <p className="message-text">
+                {content}
+                {message.isEdited && (
+                  <span className="message-edited-label"> (edited)</span>
+                )}
+              </p>
+            )}
+          </>
+        );
+    }
+  };
+
   return (
     <div className={`message-bubble-wrapper ${isSent ? 'sent' : 'received'} ${isPending ? 'pending' : ''}`}>
       <div className="message-bubble-content">
@@ -45,24 +291,8 @@ const MessageBubble = ({ message, currentUserId, onDelete }) => {
         )}
 
         <div className={`message-bubble ${isPending ? 'message-pending' : ''}`}>
-          {/* Message Image if exists */}
-          {message.image && (
-            <img
-              src={message.image}
-              alt="Message attachment"
-              className="message-image"
-            />
-          )}
-
-          {/* Message Text */}
-          {message.content && (
-            <p className="message-text">
-              {message.content}
-              {message.isEdited && (
-                <span className="message-edited-label"> (edited)</span>
-              )}
-            </p>
-          )}
+          {/* Render message content based on type */}
+          {renderMessageContent()}
 
           {/* Message Meta */}
           <div className="message-meta">
@@ -75,7 +305,7 @@ const MessageBubble = ({ message, currentUserId, onDelete }) => {
               <span className="message-status-indicator">
                 {isPending ? (
                   <svg viewBox="0 0 24 24" fill="currentColor" className="pending-icon">
-                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.3"/>
+                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.3" />
                   </svg>
                 ) : message.isRead || message.read ? (
                   <svg viewBox="0 0 24 24" fill="currentColor" className="read-icon">

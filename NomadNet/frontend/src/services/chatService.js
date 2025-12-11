@@ -3,7 +3,7 @@ import api from './api';
 
 const chatService = {
   // ==================== CONVERSATIONS ====================
-  
+
   // Get all conversations
   getConversations: async (params = {}) => {
     try {
@@ -60,7 +60,7 @@ const chatService = {
   // Mark conversation as read
   markConversationAsRead: async (conversationId) => {
     try {
-      const response = await api.post(`/api/conversations/${conversationId}/read`);  // ✅ Removed /api
+      const response = await api.put(`/api/conversations/${conversationId}/read`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error;
