@@ -110,6 +110,13 @@ export const ChatProvider = ({ children }) => {
             return prev;
           }
 
+          // Check if message already exists (by ID or optimistic update)
+          const messageExists = prev.some((m) => m._id === message._id);
+          if (messageExists) {
+            console.log('Message already exists, skipping socket event');
+            return prev;
+          }
+
           // Prevent duplicates from own sent messages (optimistic update already added it)
           const senderId = message.sender?._id || message.sender;
           if (senderId === currentUserId) {
