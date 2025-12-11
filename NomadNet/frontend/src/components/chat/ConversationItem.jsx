@@ -1,12 +1,12 @@
 // src/components/chat/ConversationItem.jsx
 import React, { useState } from 'react';
 import { formatMessageTime } from '../../utils/dateFormat';
-import { 
-  getOtherParticipant, 
-  truncateText, 
-  getUserDisplayName, 
+import {
+  getOtherParticipant,
+  truncateText,
+  getUserDisplayName,
   getUserAvatar,
-  getUserId 
+  getUserId
 } from '../../utils/helpers';
 import { getUser } from '../../services/authService';
 
@@ -83,7 +83,17 @@ const ConversationItem = ({
           <p className="conversation-last-message">
             {conversation.lastMessage?.content
               ? truncateText(conversation.lastMessage.content, 40)
-              : 'Start a conversation'}
+              : conversation.lastMessage?.type === 'image'
+                ? '📷 Sent an image'
+                : conversation.lastMessage?.type === 'location'
+                  ? '📍 Shared location'
+                  : conversation.lastMessage?.type === 'marketplace'
+                    ? '🛍️ Shared marketplace item'
+                    : conversation.lastMessage?.type === 'venue'
+                      ? '🏢 Shared a venue'
+                      : conversation.lastMessage?.type === 'checkin'
+                        ? '📍 Checked in'
+                        : 'Start a conversation'}
           </p>
           {conversation.unreadCount > 0 && (
             <span className="conversation-unread-badge">

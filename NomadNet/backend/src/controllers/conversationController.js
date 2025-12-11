@@ -87,7 +87,12 @@ exports.getConversations = async (req, res) => {
       .populate('participants', 'name email avatar userType location')
       .populate({
         path: 'lastMessage',
-        select: 'content sender createdAt type isRead', // note: 'type' matches your Message schema
+        select: 'content sender createdAt type isRead marketplaceItem venue checkIn',
+        populate: [
+          { path: 'marketplaceItem', select: 'title type photos' },
+          { path: 'venue', select: 'name category' },
+          { path: 'checkIn', select: 'venue location' }
+        ]
       })
       .sort({ updatedAt: -1 })
       .limit(limitNum)
@@ -105,8 +110,8 @@ exports.getConversations = async (req, res) => {
         // Fetch status for the other participant
         const status = otherParticipant
           ? await Status.findOne({ user: otherParticipant._id }).select(
-              'type message emoji expiresAt'
-            )
+            'type message emoji expiresAt'
+          )
           : null;
 
         // Safely compute unreadCount from plain object
@@ -124,9 +129,9 @@ exports.getConversations = async (req, res) => {
           ...conv,
           otherParticipant: otherParticipant
             ? {
-                ...otherParticipant,
-                status: status || null,
-              }
+              ...otherParticipant,
+              status: status || null,
+            }
             : null,
           unreadCount: unread,
           isArchived,

@@ -97,18 +97,38 @@ export const ChatProvider = ({ children }) => {
     // Handle new messages
     const handleNewMessage = (message) => {
       console.log('📥 Received new message:', message._id);
-      
+
       const currentConversation = activeConversationRef.current;
       const conversationId = message.conversation?._id || message.conversation;
 
       // Check if message is for active conversation
       if (currentConversation && currentConversation._id === conversationId) {
         setMessages((prev) => {
-          // Prevent duplicates
+          // Prevent duplicates by ID
           if (prev.some((m) => m._id === message._id)) {
-            console.log('Message already exists, skipping');
+            console.log('Message already exists (same ID), skipping');
             return prev;
           }
+
+          // Prevent duplicates from own sent messages (optimistic update already added it)
+          const senderId = message.sender?._id || message.sender;
+          if (senderId === currentUserId) {
+            // Check if we have a pending message with same content and timestamp within 2 seconds
+            const hasPending = prev.some((m) =>
+              m.pending &&
+              m.content === message.content &&
+              Math.abs(new Date(m.createdAt) - new Date(message.createdAt)) < 2000
+            );
+
+            if (hasPending) {
+              console.log('Own message already added optimistically, replacing pending with real');
+              // Replace pending message with real one
+              return prev.map((m) =>
+                m.pending && m.content === message.content ? message : m
+              );
+            }
+          }
+
           console.log('Adding message to state');
           return [...prev, message];
         });
@@ -130,7 +150,7 @@ export const ChatProvider = ({ children }) => {
     // Handle typing indicators
     const handleTyping = (data) => {
       const { conversationId, userId, isTyping } = data;
-      
+
       if (isTyping) {
         setTypingUsers((prev) => ({
           ...prev,
@@ -180,7 +200,7 @@ export const ChatProvider = ({ children }) => {
           const updated = [...prev];
           updated[index] = { ...updated[index], ...conversation };
           // Sort by most recent
-          return updated.sort((a, b) => 
+          return updated.sort((a, b) =>
             new Date(b.updatedAt) - new Date(a.updatedAt)
           );
         }
@@ -205,10 +225,10 @@ export const ChatProvider = ({ children }) => {
   // ================== HELPER: UPDATE CONVERSATION WITH NEW MESSAGE ==================
   const updateConversationWithMessage = useCallback((message) => {
     const conversationId = message.conversation?._id || message.conversation;
-    
+
     setConversations((prev) => {
       const conversationIndex = prev.findIndex((c) => c._id === conversationId);
-      
+
       if (conversationIndex >= 0) {
         const updated = [...prev];
         updated[conversationIndex] = {
@@ -220,7 +240,7 @@ export const ChatProvider = ({ children }) => {
         const [conversation] = updated.splice(conversationIndex, 1);
         return [conversation, ...updated];
       }
-      
+
       return prev;
     });
   }, []);
@@ -292,9 +312,19 @@ export const ChatProvider = ({ children }) => {
   const sendMessage = useCallback(
     async (messageData) => {
       try {
-        const { conversationId, receiverId, content, messageType = 'text' } = messageData;
+        const {
+          conversationId,
+          receiverId,
+          content,
+          messageType = 'text',
+          imageUrl,
+          location,
+          marketplaceItemId,
+          venueId,
+          checkInId
+        } = messageData;
 
-        if (!content?.trim()) {
+        if (!content?.trim() && messageType === 'text') {
           throw new Error('Message content is required');
         }
 
@@ -304,8 +334,12 @@ export const ChatProvider = ({ children }) => {
           conversation: conversationId,
           sender: user,
           receiver: receiverId,
-          content: content.trim(),
+          content: content?.trim() || '',
           type: messageType,
+          imageUrl,
+          marketplaceItem: null, // Will be populated from backend
+          venue: null,
+          checkIn: null,
           createdAt: new Date().toISOString(),
           isRead: false,
           pending: true
@@ -313,13 +347,39 @@ export const ChatProvider = ({ children }) => {
 
         setMessages((prev) => [...prev, optimisticMessage]);
 
+        // Build complete message data for API
+        const apiMessageData = {
+          conversationId,
+          receiverId,
+          content: content?.trim() || '',
+          messageType
+        };
+
+        // Add type-specific fields
+        if (messageType === 'image' && imageUrl) {
+          apiMessageData.imageUrl = imageUrl;
+        }
+        if (messageType === 'location' && location) {
+          console.log('🗺️ ChatContext: Adding location to API request:', location);
+          apiMessageData.location = location;
+        }
+        if (messageType === 'marketplace' && marketplaceItemId) {
+          apiMessageData.marketplaceItemId = marketplaceItemId;
+        }
+        if (messageType === 'venue' && venueId) {
+          apiMessageData.venueId = venueId;
+        }
+        if (messageType === 'checkin' && checkInId) {
+          apiMessageData.checkInId = checkInId;
+        }
+
         // Send via API (which will also emit socket event)
-        const response = await chatService.sendMessage(messageData);
+        const response = await chatService.sendMessage(apiMessageData);
         const newMessage = response.data?.message || response.data;
 
         // Replace optimistic message with real one
-        setMessages((prev) => 
-          prev.map((msg) => 
+        setMessages((prev) =>
+          prev.map((msg) =>
             msg._id === optimisticMessage._id ? newMessage : msg
           )
         );
@@ -327,7 +387,7 @@ export const ChatProvider = ({ children }) => {
         return newMessage;
       } catch (err) {
         // Remove optimistic message on error
-        setMessages((prev) => 
+        setMessages((prev) =>
           prev.filter((msg) => !msg.pending)
         );
         setError(err.message || 'Failed to send message');

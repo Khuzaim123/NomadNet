@@ -8,7 +8,16 @@ const User = require('../models/User');
 // @access  Private
 exports.sendMessage = async (req, res) => {
   try {
-    const { conversationId, receiverId, content, messageType = 'text', attachments } = req.body;
+    const {
+      conversationId,
+      receiverId,
+      content,
+      messageType = 'text',
+      attachments,
+      marketplaceItemId,
+      venueId,
+      checkInId
+    } = req.body;
     const senderId = req.user.id;
 
     // Validate receiver exists
@@ -20,9 +29,43 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
+    // ✅ Validate entity references for new message types
+    if (messageType === 'marketplace') {
+      const MarketplaceItem = require('../models/MarketplaceItem');
+      const item = await MarketplaceItem.findById(marketplaceItemId);
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          message: 'Marketplace item not found'
+        });
+      }
+    }
+
+    if (messageType === 'venue') {
+      const Venue = require('../models/Venue');
+      const venue = await Venue.findById(venueId);
+      if (!venue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Venue not found'
+        });
+      }
+    }
+
+    if (messageType === 'checkin') {
+      const CheckIn = require('../models/CheckIn');
+      const checkIn = await CheckIn.findById(checkInId);
+      if (!checkIn) {
+        return res.status(404).json({
+          success: false,
+          message: 'Check-in not found'
+        });
+      }
+    }
+
     // Get or create conversation
     let conversation = await Conversation.findById(conversationId);
-    
+
     if (!conversation) {
       conversation = await Conversation.create({
         participants: [senderId, receiverId],
@@ -45,30 +88,62 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-    // Create message
-    const message = await Message.create({
+    // ✅ Create message with new reference fields
+    const messageData = {
       conversation: conversation._id,
       sender: senderId,
       receiver: receiverId,
       content,
       type: messageType,
       attachments: attachments || [],
-    });
+    };
+
+    // Add imageUrl for image messages
+    if (req.body.imageUrl) {
+      messageData.imageUrl = req.body.imageUrl;
+    }
+
+
+    // Add location for location messages
+    if (req.body.location) {
+      console.log('📍 Backend received location:', JSON.stringify(req.body.location, null, 2));
+      messageData.location = req.body.location;
+    } else if (messageType === 'location') {
+      console.log('⚠️ Location message but NO location in req.body!');
+      console.log('req.body:', req.body);
+    }
+
+
+    // Add entity references based on message type
+    if (messageType === 'marketplace' && marketplaceItemId) {
+      messageData.marketplaceItem = marketplaceItemId;
+    }
+    if (messageType === 'venue' && venueId) {
+      messageData.venue = venueId;
+    }
+    if (messageType === 'checkin' && checkInId) {
+      messageData.checkIn = checkInId;
+    }
+
+    const message = await Message.create(messageData);
 
     // Update conversation
     conversation.lastMessage = message._id;
     const currentUnreadCount = conversation.unreadCount.get(receiverId) || 0;
     conversation.unreadCount.set(receiverId, currentUnreadCount + 1);
-    
+
     conversation.archivedBy = conversation.archivedBy.filter(
       id => id.toString() !== senderId
     );
-    
+
     await conversation.save();
 
-    // Populate message with sender and receiver info
+    // ✅ Populate message with sender, receiver, and entity references
     await message.populate('sender', 'name email avatar username displayName');
     await message.populate('receiver', 'name email avatar username displayName');
+    await message.populate('marketplaceItem', 'title type category photos priceType price owner');
+    await message.populate('venue', 'name category location address photos');
+    await message.populate('checkIn', 'venue location address note createdAt');
 
     // ✅ REAL-TIME: Emit socket event to all participants
     const io = req.app.get('io');
@@ -80,22 +155,27 @@ exports.sendMessage = async (req, res) => {
         receiver: message.receiver,
         content: message.content,
         type: message.type,
+        imageUrl: message.imageUrl,  // Add imageUrl
+        location: message.location,   // Add location
         attachments: message.attachments,
+        marketplaceItem: message.marketplaceItem,
+        venue: message.venue,
+        checkIn: message.checkIn,
         createdAt: message.createdAt,
         isRead: false
       };
 
       // Emit to conversation room
       io.to(conversation._id.toString()).emit('newMessage', messageData);
-      
+
       // Also emit to receiver's personal room for notifications
       io.to(`user:${receiverId}`).emit('newMessage', messageData);
-      
+
       // Emit conversation update for sidebar
       const conversationUpdate = await Conversation.findById(conversation._id)
         .populate('participants', 'name email avatar username displayName')
         .populate('lastMessage');
-      
+
       io.to(`user:${receiverId}`).emit('conversationUpdated', conversationUpdate);
       io.to(`user:${senderId}`).emit('conversationUpdated', conversationUpdate);
 
@@ -126,7 +206,7 @@ exports.getMessages = async (req, res) => {
     const userId = req.user.id;
 
     const conversation = await Conversation.findById(conversationId);
-    
+
     if (!conversation) {
       return res.status(404).json({
         success: false,
@@ -151,6 +231,9 @@ exports.getMessages = async (req, res) => {
     })
       .populate('sender', 'name email avatar username displayName')
       .populate('receiver', 'name email avatar username displayName')
+      .populate('marketplaceItem', 'title type category photos priceType price owner')
+      .populate('venue', 'name category location address photos')
+      .populate('checkIn', 'venue location address note createdAt')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -250,7 +333,7 @@ exports.deleteMessage = async (req, res) => {
       });
     }
 
-    const isAuthorized = 
+    const isAuthorized =
       message.sender.toString() === req.user.id ||
       message.receiver.toString() === req.user.id;
 

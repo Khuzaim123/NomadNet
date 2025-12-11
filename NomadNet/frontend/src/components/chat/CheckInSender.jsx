@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { getMyActiveCheckIn } from '../../services/checkInService';
 import { getNearbyVenues } from '../../services/venueService';
 import LocationSearchInput from './LocationSearchInput';
+import { MAPBOX_TOKEN } from '../../config/mapbox';
 
 const CheckInSender = ({ onClose, onSend }) => {
   const [mode, setMode] = useState('new');
@@ -20,9 +21,6 @@ const CheckInSender = ({ onClose, onSend }) => {
   const [loadingVenues, setLoadingVenues] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
 
-  // ✅ Get Mapbox token from environment
-  const mapboxToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
-
   useEffect(() => {
     loadExistingCheckIn();
   }, []);
@@ -31,11 +29,20 @@ const CheckInSender = ({ onClose, onSend }) => {
     try {
       setLoadingExisting(true);
       const response = await getMyActiveCheckIn();
-      if (response?.data) {
-        setExistingCheckIn(response.data);
+      console.log('📥 getMyActiveCheckIn response:', response);
+      console.log('📥 response.data:', response?.data);
+
+      // Handle different response structures
+      const checkInData = response?.data?.checkIn || response?.data;
+      console.log('✅ Extracted checkIn:', checkInData);
+
+      if (checkInData && checkInData._id) {
+        setExistingCheckIn(checkInData);
+      } else {
+        console.log('⚠️ No valid check-in found in response');
       }
     } catch (error) {
-      console.log('No active check-in found');
+      console.log('No active check-in found:', error);
     } finally {
       setLoadingExisting(false);
     }
@@ -54,13 +61,13 @@ const CheckInSender = ({ onClose, onSend }) => {
         setCoordinates(coords);
         setAddress(`${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`);
         setLoadingLocation(false);
-        
+
         loadNearbyVenues(coords[0], coords[1]);
       },
       (error) => {
         console.error('Error getting location:', error);
         let errorMessage = 'Failed to get your location. ';
-        
+
         if (error.code === 1) {
           errorMessage += 'Please enable location access in your browser settings.';
         } else if (error.code === 2) {
@@ -68,7 +75,7 @@ const CheckInSender = ({ onClose, onSend }) => {
         } else if (error.code === 3) {
           errorMessage += 'Location request timed out.';
         }
-        
+
         alert(errorMessage);
         setLoadingLocation(false);
       },
@@ -116,14 +123,16 @@ const CheckInSender = ({ onClose, onSend }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (mode === 'existing' && existingCheckIn) {
       const content = existingCheckIn.note || existingCheckIn.venue?.name || 'Shared check-in';
-      onSend({
+      const sendData = {
         checkInId: existingCheckIn._id,
         isInvitation,
         content
-      });
+      };
+      console.log('📍 CheckInSender - sending existing check-in:', sendData);
+      onSend(sendData);
     } else {
       if (!coordinates) {
         alert('Please select a location first');
@@ -131,8 +140,8 @@ const CheckInSender = ({ onClose, onSend }) => {
       }
 
       const content = note.trim() || venueName.trim() || selectedVenue?.name || 'Shared my location';
-      
-      onSend({
+
+      const sendData = {
         coordinates,
         venueId: selectedVenue?._id,
         venueName: venueName.trim() || selectedVenue?.name,
@@ -141,7 +150,9 @@ const CheckInSender = ({ onClose, onSend }) => {
         estimatedDuration: estimatedDuration ? parseInt(estimatedDuration) : undefined,
         isInvitation,
         content
-      });
+      };
+      console.log('📍 CheckInSender - sending new location:', sendData);
+      onSend(sendData);
     }
   };
 
@@ -321,7 +332,7 @@ const CheckInSender = ({ onClose, onSend }) => {
                     </label>
                     <LocationSearchInput
                       onLocationSelect={handleLocationSearch}
-                      mapboxToken={mapboxToken}
+                      mapboxToken={MAPBOX_TOKEN}
                     />
                   </div>
                 )}
@@ -422,10 +433,10 @@ const CheckInSender = ({ onClose, onSend }) => {
 
             {/* Invitation Toggle */}
             <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.75rem', 
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
                 cursor: 'pointer',
                 padding: '0.75rem',
                 background: isInvitation ? 'rgba(236, 72, 153, 0.1)' : 'transparent',
@@ -437,8 +448,8 @@ const CheckInSender = ({ onClose, onSend }) => {
                   type="checkbox"
                   checked={isInvitation}
                   onChange={(e) => setIsInvitation(e.target.checked)}
-                  style={{ 
-                    width: '20px', 
+                  style={{
+                    width: '20px',
                     height: '20px',
                     accentColor: '#ec4899'
                   }}
