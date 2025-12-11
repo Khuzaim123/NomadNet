@@ -40,7 +40,7 @@ const chatService = {
   // Toggle archive conversation
   toggleArchiveConversation: async (conversationId) => {
     try {
-      const response = await api.patch(`/api/conversations/${conversationId}/archive`);  // ✅ Removed /api
+      const response = await api.put(`/api/conversations/${conversationId}/archive`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error;

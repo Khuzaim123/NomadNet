@@ -28,6 +28,13 @@ const ChatList = () => {
     loadConversations(showArchived);
   }, [showArchived, loadConversations]);
 
+  // Wrapper to ensure conversations reload with correct archive state
+  const handleArchiveConversation = async (conversationId) => {
+    await archiveConversation(conversationId);
+    // Reload conversations with current tab's state
+    await loadConversations(showArchived);
+  };
+
   const filteredConversations = conversations.filter((conv) => {
     const otherUser = getOtherParticipant(conv, currentUserId);
     if (!otherUser) return false;
@@ -102,8 +109,8 @@ const ChatList = () => {
               searchQuery
                 ? 'No conversations found'
                 : showArchived
-                ? 'No archived conversations'
-                : 'No conversations yet'
+                  ? 'No archived conversations'
+                  : 'No conversations yet'
             }
             description={
               searchQuery
@@ -119,7 +126,7 @@ const ChatList = () => {
                 conversation={conversation}
                 isActive={activeConversation?._id === conversation._id}
                 onClick={() => selectConversation(conversation)}
-                onArchive={archiveConversation}
+                onArchive={handleArchiveConversation}
                 onDelete={deleteConversation}
               />
             ))}
