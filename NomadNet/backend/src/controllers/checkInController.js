@@ -1,71 +1,89 @@
+// controllers/checkinController.js
+
 const CheckIn = require('../models/CheckIn');
 const Venue = require('../models/Venue');
-const User = require('../models/User');
 const { emitNewCheckIn, emitCheckInUpdate, emitCheckInDelete } = require('../utils/socketEmitters');
 
 // ======================
 // 📍 CHECK-IN MANAGEMENT
 // ======================
 
-// @desc    Create a check-in
+// @desc    Create a check-in (venue-only)
 // @route   POST /api/checkins
 // @access  Private
 exports.createCheckIn = async (req, res) => {
   try {
     const {
       venueId,
-      longitude,
-      latitude,
-      address,
       note,
-      visibility = 'public'
+      visibility = 'public',
+      address // optional override
     } = req.body;
 
-    // Validate coordinates
-    if (!longitude || !latitude) {
+    // ✅ Require a venue: user can only check in to existing venues
+    if (!venueId) {
       return res.status(400).json({
         status: 'error',
-        message: 'Please provide longitude and latitude'
+        message: 'venueId is required to check in. You can only check in to existing venues.'
       });
     }
 
-    const lng = parseFloat(longitude);
-    const lat = parseFloat(latitude);
-
-    if (isNaN(lng) || isNaN(lat) || lng < -180 || lng > 180 || lat < -90 || lat > 90) {
-      return res.status(400).json({
+    // Find venue
+    const venue = await Venue.findById(venueId);
+    if (!venue) {
+      return res.status(404).json({
         status: 'error',
-        message: 'Invalid coordinates'
+        message: 'Venue not found'
       });
     }
 
-    // Check if venue exists (if provided)
-    let venue = null;
-    if (venueId) {
-      venue = await Venue.findById(venueId);
-      if (!venue) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Venue not found'
-        });
-      }
+    // Ensure venue has valid coordinates
+    if (
+      !venue.location ||
+      !Array.isArray(venue.location.coordinates) ||
+      venue.location.coordinates.length !== 2
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Venue does not have valid location coordinates'
+      });
     }
 
-    // Delete user's previous active check-ins (optional: only keep latest)
+    const [lng, lat] = venue.location.coordinates;
+
+    // Optional: validate coords
+    if (
+      isNaN(lng) ||
+      isNaN(lat) ||
+      lng < -180 ||
+      lng > 180 ||
+      lat < -90 ||
+      lat > 90
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Venue coordinates are invalid'
+      });
+    }
+
+    // Delete user's previous active check-ins (only keep latest)
     await CheckIn.deleteMany({
       user: req.user._id,
       expiresAt: { $gt: Date.now() }
     });
 
-    // Create check-in
+    // Use venue address by default, allow optional override from client
+    const checkInAddress = address || venue.address;
+
+    // Create check-in pinned to the venue location
     const checkIn = await CheckIn.create({
       user: req.user._id,
-      venue: venueId || null,
+      venue: venue._id,
       location: {
         type: 'Point',
         coordinates: [lng, lat]
       },
-      address,
+      address: checkInAddress,
       note,
       visibility,
       expiresAt: Date.now() + 4 * 60 * 60 * 1000 // 4 hours
@@ -73,9 +91,7 @@ exports.createCheckIn = async (req, res) => {
 
     // Populate user and venue
     await checkIn.populate('user', 'username displayName avatar profession');
-    if (venueId) {
-      await checkIn.populate('venue', 'name category address');
-    }
+    await checkIn.populate('venue', 'name category address');
 
     emitNewCheckIn(checkIn);
 
@@ -110,8 +126,10 @@ exports.getCheckInById = async (req, res) => {
     }
 
     // Check visibility
-    if (checkIn.visibility === 'private' && 
-        (!req.user || checkIn.user._id.toString() !== req.user._id.toString())) {
+    if (
+      checkIn.visibility === 'private' &&
+      (!req.user || checkIn.user._id.toString() !== req.user._id.toString())
+    ) {
       return res.status(403).json({
         status: 'error',
         message: 'This check-in is private'
@@ -138,7 +156,6 @@ exports.getUserCheckIns = async (req, res) => {
     const userId = req.params.userId;
     const { limit = 20, page = 1, includeExpired = false } = req.query;
 
-    // Build query
     const query = { user: userId };
 
     // If viewing others' check-ins, only show public/connections
@@ -181,12 +198,7 @@ exports.getUserCheckIns = async (req, res) => {
 // @access  Private
 exports.getNearbyCheckIns = async (req, res) => {
   try {
-    const {
-      longitude,
-      latitude,
-      radius = 5000, // 5km default
-      limit = 50
-    } = req.query;
+    const { longitude, latitude, radius = 5000, limit = 50 } = req.query;
 
     if (!longitude || !latitude) {
       return res.status(400).json({
@@ -206,7 +218,7 @@ exports.getNearbyCheckIns = async (req, res) => {
       });
     }
 
-    // Find nearby active check-ins
+    // Find nearby active check-ins (includes current user now)
     const checkIns = await CheckIn.find({
       location: {
         $near: {
@@ -218,14 +230,13 @@ exports.getNearbyCheckIns = async (req, res) => {
         }
       },
       expiresAt: { $gt: Date.now() },
-      visibility: { $in: ['public', 'connections'] },
-      user: { $ne: req.user._id } // Exclude current user
+      visibility: { $in: ['public', 'connections'] }
+      // ❌ Removed: user: { $ne: req.user._id }
     })
       .populate('user', 'username displayName avatar profession skills')
       .populate('venue', 'name category address')
       .limit(parseInt(limit));
 
-    // Calculate distance
     const checkInsWithDistance = checkIns.map(checkIn => {
       const distance = calculateDistance(
         [lng, lat],
@@ -286,7 +297,7 @@ exports.getVenueCheckIns = async (req, res) => {
   }
 };
 
-// @desc    Update check-in
+// @desc    Update check-in (note/visibility only)
 // @route   PATCH /api/checkins/:id
 // @access  Private (own check-in only)
 exports.updateCheckIn = async (req, res) => {
@@ -308,7 +319,6 @@ exports.updateCheckIn = async (req, res) => {
       });
     }
 
-    // Only allow updating note and visibility
     const { note, visibility } = req.body;
 
     if (note !== undefined) checkIn.note = note;

@@ -1,32 +1,19 @@
+// src/routes/venueRoutes.js
 const express = require('express');
 const router = express.Router();
 
-console.log('📦 Loading venueRoutes.js...');
+console.log(' Loading venueRoutes.js...');
 
-// Controllers
-const venueController = require('../controllers/venueController');
-const { protect, optionalProtect } = require('../middleware/authMiddleware');
-
-// Upload middleware
-let uploadMiddleware;
-try {
-  uploadMiddleware = require('../middleware/uploadMiddleware');
-  console.log('✅ Upload middleware loaded for venues');
-} catch (error) {
-  console.error('❌ Upload middleware failed:', error.message);
-  process.exit(1);
-}
-
-// Validators
+// Import only the read-only controllers
 const {
-  createVenueValidation,
-  updateVenueValidation,
-  nearbySearchValidation,
-  validate
-} = require('../middleware/venueValidator');
+  getVenueById,
+  getAllVenues,
+  getNearbyVenues,
+  getCategories
+} = require('../controllers/venueController');
 
 // ======================
-// 📍 VENUE ROUTES
+//  VENUE ROUTES (READ-ONLY)
 // ======================
 
 // Test route
@@ -39,57 +26,22 @@ router.get('/test', (req, res) => {
 });
 
 // Get venue categories (PUBLIC)
-router.get('/categories/list', venueController.getCategories);
+router.get('/categories/list', getCategories);
 
 // Search nearby venues (PUBLIC)
-router.get(
-  '/nearby/search',
-  nearbySearchValidation,
-  validate,
-  venueController.getNearbyVenues
-);
+router.get('/nearby/search', getNearbyVenues);
 
 // Get all venues with filters (PUBLIC)
-router.get('/', venueController.getAllVenues);
-
-// Create venue (PROTECTED)
-router.post(
-  '/',
-  protect,
-  uploadMiddleware.array('photos', 5), // ✅ Accept up to 5 photos (optional)
-  createVenueValidation,
-  validate,
-  venueController.createVenue
-);
+router.get('/', getAllVenues);
 
 // Get venue by ID (PUBLIC)
-router.get('/:id', venueController.getVenueById);
-
-// Update venue (PROTECTED - creator only)
-router.put(
-  '/:id',
-  protect,
-  updateVenueValidation,
-  validate,
-  venueController.updateVenue
-);
-
-// Delete venue (PROTECTED - creator only)
-router.delete('/:id', protect, venueController.deleteVenue);
-
-// Add photo to venue (PROTECTED)
-router.post(
-  '/:id/photos',
-  protect,
-  uploadMiddleware.single('photo'),
-  venueController.addVenuePhoto
-);
+router.get('/:id', getVenueById);
 
 // ======================
 // Debug: Log routes
 // ======================
-console.log('\n✅ Venue routes registered:');
-router.stack.forEach((r) => {
+console.log('\n Venue routes registered:');
+router.stack.forEach(r => {
   if (r.route) {
     const methods = Object.keys(r.route.methods).join(', ').toUpperCase();
     console.log(`   ${methods} /api/venues${r.route.path}`);

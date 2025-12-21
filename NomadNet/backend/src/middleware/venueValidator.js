@@ -1,14 +1,14 @@
 const { body, query, validationResult } = require('express-validator');
 
 // ======================
-// 📍 VENUE VALIDATIONS
+//  VENUE VALIDATIONS
 // ======================
 
 const createVenueValidation = [
-  // ✅ Skip validation if multipart (multer handles it differently)
+  //  Skip validation if multipart (multer handles it differently)
   (req, res, next) => {
     if (req.headers['content-type']?.includes('multipart/form-data')) {
-      console.log('📦 Multipart request - adapting validation');
+      console.log(' Multipart request - adapting validation');
       return next();
     }
     next();
@@ -145,7 +145,7 @@ const nearbySearchValidation = [
 ];
 
 // ======================
-// ✅ Validation Handler
+//  Validation Handler
 // ======================
 const validate = (req, res, next) => {
   const errors = validationResult(req);

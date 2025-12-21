@@ -12,10 +12,19 @@ export const getAllVenues = async (filters = {}) => {
     
     if (filters.category) params.append('category', filters.category);
     if (filters.search) params.append('search', filters.search);
-    if (filters.amenities) params.append('amenities', filters.amenities);
+    if (filters.amenities) {
+      if (Array.isArray(filters.amenities)) {
+        params.append('amenities', filters.amenities.join(','));
+      } else {
+        params.append('amenities', filters.amenities);
+      }
+    }
     if (filters.minRating) params.append('minRating', filters.minRating);
     if (filters.page) params.append('page', filters.page);
     if (filters.limit) params.append('limit', filters.limit);
+    if (filters.radius) params.append('radius', filters.radius);
+    if (filters.longitude) params.append('longitude', filters.longitude);
+    if (filters.latitude) params.append('latitude', filters.latitude);
 
     const response = await api.get(`/api/venues?${params.toString()}`);
     return response.data;
@@ -26,18 +35,24 @@ export const getAllVenues = async (filters = {}) => {
 };
 
 // Get nearby venues
-export const getNearbyVenues = async (longitude, latitude, radius = 5000, category = null, amenities = null, minRating = null, limit = 50) => {
+export const getNearbyVenues = async (longitude, latitude, filters = {}) => {
   try {
     const params = new URLSearchParams({
       longitude,
       latitude,
-      radius,
-      limit
+      radius: filters.radius || 5000,
+      limit: filters.limit || 50
     });
 
-    if (category) params.append('category', category);
-    if (amenities) params.append('amenities', amenities);
-    if (minRating) params.append('minRating', minRating);
+    if (filters.category) params.append('category', filters.category);
+    if (filters.amenities) {
+      if (Array.isArray(filters.amenities)) {
+        params.append('amenities', filters.amenities.join(','));
+      } else {
+        params.append('amenities', filters.amenities);
+      }
+    }
+    if (filters.minRating) params.append('minRating', filters.minRating);
 
     const response = await api.get(`/api/venues/nearby/search?${params.toString()}`);
     return response.data;
@@ -59,10 +74,10 @@ export const getVenueById = async (id) => {
 };
 
 // Create venue
-export const createVenue = async (venueData) => {
+export const createVenue = async (venueData, photos = []) => {
   try {
     // If there are photos, use FormData
-    if (venueData.photos && venueData.photos.length > 0) {
+    if (photos && photos.length > 0) {
       const formData = new FormData();
 
       formData.append('name', venueData.name);
@@ -87,7 +102,7 @@ export const createVenue = async (venueData) => {
       }
 
       // Add photos
-      venueData.photos.forEach((photo) => {
+      photos.forEach((photo) => {
         formData.append('photos', photo);
       });
 
@@ -143,6 +158,17 @@ export const addVenuePhoto = async (id, photoFile) => {
   }
 };
 
+// Delete venue photo
+export const deleteVenuePhoto = async (venueId, photoId) => {
+  try {
+    const response = await api.delete(`/api/venues/${venueId}/photos/${photoId}`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Delete venue photo error:', error);
+    throw error;
+  }
+};
+
 // Get venue categories
 export const getVenueCategories = async () => {
   try {
@@ -154,24 +180,152 @@ export const getVenueCategories = async () => {
   }
 };
 
+// Check in to a venue
+export const checkIn = async (venueId, checkInData) => {
+  try {
+    const response = await api.post(`/api/venues/${venueId}/checkin`, checkInData);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Check in error:', error);
+    throw error;
+  }
+};
+
+// Get venue check-ins
+export const getVenueCheckIns = async (venueId, params = {}) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.page) queryParams.append('page', params.page);
+
+    const response = await api.get(`/api/venues/${venueId}/checkins?${queryParams.toString()}`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Get check-ins error:', error);
+    throw error;
+  }
+};
+
+// Get user's check-ins
+export const getUserCheckIns = async (params = {}) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.page) queryParams.append('page', params.page);
+
+    const response = await api.get(`/api/checkins?${queryParams.toString()}`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Get user check-ins error:', error);
+    throw error;
+  }
+};
+
+// Rate a venue
+export const rateVenue = async (venueId, ratings) => {
+  try {
+    const response = await api.post(`/api/venues/${venueId}/rate`, ratings);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Rate venue error:', error);
+    throw error;
+  }
+};
+
+// Add venue to favorites
+export const addToFavorites = async (venueId) => {
+  try {
+    const response = await api.post(`/api/venues/${venueId}/favorite`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Add to favorites error:', error);
+    throw error;
+  }
+};
+
+// Remove venue from favorites
+export const removeFromFavorites = async (venueId) => {
+  try {
+    const response = await api.delete(`/api/venues/${venueId}/favorite`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Remove from favorites error:', error);
+    throw error;
+  }
+};
+
+// Get user's favorite venues
+export const getFavoriteVenues = async () => {
+  try {
+    const response = await api.get('/api/venues/favorites');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Get favorites error:', error);
+    throw error;
+  }
+};
+
+// Search venues
+export const searchVenues = async (query, filters = {}) => {
+  try {
+    const params = new URLSearchParams({ search: query });
+    
+    if (filters.category) params.append('category', filters.category);
+    if (filters.amenities) params.append('amenities', filters.amenities);
+    if (filters.minRating) params.append('minRating', filters.minRating);
+    if (filters.limit) params.append('limit', filters.limit);
+
+    const response = await api.get(`/api/venues/search?${params.toString()}`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Search venues error:', error);
+    throw error;
+  }
+};
+
 // Category constants
 export const VENUE_CATEGORIES = [
-  { value: 'cafe', label: 'Cafe', icon: '☕' },
-  { value: 'coworking', label: 'Coworking Space', icon: '💼' },
-  { value: 'restaurant', label: 'Restaurant', icon: '🍽️' },
-  { value: 'bar', label: 'Bar', icon: '🍺' },
-  { value: 'park', label: 'Park', icon: '🌳' },
-  { value: 'library', label: 'Library', icon: '📚' },
-  { value: 'hotel', label: 'Hotel', icon: '🏨' },
-  { value: 'other', label: 'Other', icon: '📍' }
+  { value: 'cafe', label: 'Cafe', icon: '☕', description: 'Coffee shops & cafes' },
+  { value: 'coworking', label: 'Coworking Space', icon: '💼', description: 'Shared workspaces' },
+  { value: 'restaurant', label: 'Restaurant', icon: '🍽️', description: 'Dining spots' },
+  { value: 'bar', label: 'Bar', icon: '🍺', description: 'Bars & pubs' },
+  { value: 'park', label: 'Park', icon: '🌳', description: 'Outdoor spaces' },
+  { value: 'library', label: 'Library', icon: '📚', description: 'Public libraries' },
+  { value: 'hotel', label: 'Hotel', icon: '🏨', description: 'Hotels & hostels' },
+  { value: 'other', label: 'Other', icon: '📍', description: 'Other venues' }
 ];
 
 export const AMENITIES = [
-  { value: 'wifi', label: 'WiFi' },
-  { value: 'power_outlets', label: 'Power Outlets' },
-  { value: 'coffee', label: 'Coffee' },
-  { value: 'quiet', label: 'Quiet' },
-  { value: 'air_conditioning', label: 'Air Conditioning' },
-  { value: 'outdoor_seating', label: 'Outdoor Seating' },
-  { value: 'parking', label: 'Parking' }
+  { value: 'wifi', label: 'Free WiFi', icon: '📶' },
+  { value: 'power_outlets', label: 'Power Outlets', icon: '🔌' },
+  { value: 'coffee', label: 'Coffee Available', icon: '☕' },
+  { value: 'quiet', label: 'Quiet Space', icon: '🤫' },
+  { value: 'air_conditioning', label: 'Air Conditioning', icon: '❄️' },
+  { value: 'outdoor_seating', label: 'Outdoor Seating', icon: '🌤️' },
+  { value: 'parking', label: 'Parking Available', icon: '🅿️' }
 ];
+
+// Export default object with all functions
+const venueService = {
+  getAllVenues,
+  getNearbyVenues,
+  getVenueById,
+  createVenue,
+  updateVenue,
+  deleteVenue,
+  addVenuePhoto,
+  deleteVenuePhoto,
+  getVenueCategories,
+  checkIn,
+  getVenueCheckIns,
+  getUserCheckIns,
+  rateVenue,
+  addToFavorites,
+  removeFromFavorites,
+  getFavoriteVenues,
+  searchVenues,
+  VENUE_CATEGORIES,
+  AMENITIES
+};
+
+export default venueService;
