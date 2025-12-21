@@ -8,13 +8,18 @@ import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 import ChatPage from './pages/ChatPage';
-
+import { AuthProvider } from './context/AuthContext';
 // Marketplace Pages
 import MarketplacePage from './pages/MarketplacePage';
 import CreateListingPage from './pages/CreateListingPage';
 import ListingDetailsPage from './pages/ListingDetailsPage';
 import MyListingsPage from './pages/MyListingsPage';
 import EditListingPage from './pages/EditListingPage';
+
+// Venue Pages
+import VenuesPage from './pages/VenuePage';
+import VenueDetails from './components/venues/VenueDetails';
+
 
 import './App.css';
 import './styles/chat.css';
@@ -44,6 +49,10 @@ function App() {
               <Route path="/marketplace/my-listings" element={<MyListingsPage />} />
               <Route path="/marketplace/:id" element={<ListingDetailsPage />} />
               <Route path="/marketplace/edit/:id" element={<EditListingPage />} />
+
+              {/* Venues */}
+              <Route path="/venues" element={<VenuesPage />} />
+              <Route path="/venues/:id" element={<VenueDetails />} />
 
               {/* 404 */}
               <Route path="*" element={<NotFoundPage />} />

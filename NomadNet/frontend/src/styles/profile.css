@@ -25,204 +25,6 @@
 }
 
 /* ============================================
-   HEADER ROW - LOGOUT BUTTON PLACEMENT
-   ============================================ */
-
-.profile-header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1.5rem;
-  margin-bottom: 0;
-}
-
-.profile-header-main {
-  flex: 1;
-  min-width: 0;
-}
-
-/* Logout Button */
-.profile-logout-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1.25rem;
-  border-radius: 8px;
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  background: rgba(239, 68, 68, 0.1);
-  color: #fca5a5;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-top: 2.5rem;
-}
-
-.profile-logout-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.6);
-  color: #fecaca;
-}
-
-.profile-logout-btn:active {
-  transform: scale(0.98);
-}
-
-.profile-logout-icon {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* ============================================
-   PROFILE HEADER - FULL WIDTH
-   ============================================ */
-
-.profile-header {
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  padding: 2rem;
-  background: rgba(30, 41, 59, 0.6);
-  border-radius: 16px;
-  margin-bottom: 2rem;
-  border: 1px solid rgba(51, 65, 85, 0.5);
-}
-
-.avatar-container {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.profile-avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid rgba(99, 102, 241, 0.4);
-  background: #1e293b;
-}
-
-.avatar-change-btn {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  background: #6366f1;
-  color: white;
-  border: 3px solid #1e293b;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.avatar-change-btn:hover {
-  background: #4f46e5;
-  transform: scale(1.1);
-}
-
-/* Profile Info */
-.profile-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.display-name {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #f1f5f9;
-  margin-bottom: 0.25rem;
-  line-height: 1.2;
-}
-
-.username {
-  font-size: 1rem;
-  color: #94a3b8;
-  margin-bottom: 0.75rem;
-  font-weight: 400;
-}
-
-.profession {
-  display: inline-block;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #a5b4fc;
-  background: rgba(99, 102, 241, 0.15);
-  padding: 0.35rem 0.9rem;
-  border-radius: 6px;
-  border: 1px solid rgba(99, 102, 241, 0.25);
-}
-
-/* Profile Actions - Aligned Right */
-.profile-actions {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-
-.action-btn {
-  padding: 0.65rem 1.25rem;
-  border: 1px solid rgba(51, 65, 85, 0.8);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.6);
-  color: #e2e8f0;
-  font-weight: 500;
-  font-size: 0.875rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.action-btn:hover {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: rgba(99, 102, 241, 0.4);
-  color: #f1f5f9;
-}
-
-.action-btn.primary {
-  background: #6366f1;
-  border-color: #6366f1;
-  color: white;
-}
-
-.action-btn.primary:hover {
-  background: #4f46e5;
-  border-color: #4f46e5;
-}
-
-.action-btn.secondary {
-  background: transparent;
-  border-color: rgba(148, 163, 184, 0.4);
-  color: #cbd5e1;
-}
-
-.action-btn.secondary:hover {
-  background: rgba(148, 163, 184, 0.1);
-  border-color: rgba(148, 163, 184, 0.6);
-}
-
-.action-btn.danger {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
-}
-
-.action-btn.danger:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.6);
-}
-
-/* ============================================
    PROFILE DETAILS GRID - FULL WIDTH
    ============================================ */
 
@@ -244,7 +46,184 @@
   }
 }
 
-/* Profile Cards */
+/* ============================================
+   MAIN PROFILE CARD (Full Width Header)
+   ============================================ */
+
+.main-profile-card {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 2rem;
+  background: rgba(30, 41, 59, 0.7);
+  border-radius: 16px;
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.profile-main-top {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* Avatar Wrapper */
+.profile-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profile-avatar-wrapper.clickable {
+  cursor: pointer;
+}
+
+.profile-avatar-wrapper.clickable:hover .profile-avatar {
+  border-color: rgba(99, 102, 241, 0.7);
+}
+
+.profile-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(99, 102, 241, 0.4);
+  background: #1e293b;
+  transition: border-color 0.2s ease;
+}
+
+/* Avatar Edit Button */
+.avatar-edit-btn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.6rem;
+  background: #6366f1;
+  color: white;
+  border: 2px solid #1e293b;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.avatar-edit-btn:hover {
+  background: #4f46e5;
+  transform: scale(1.05);
+}
+
+/* Profile Main Info */
+.profile-main-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-main-info h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 0.25rem 0;
+  line-height: 1.2;
+}
+
+.profile-username {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  margin: 0 0 0.5rem 0;
+  font-weight: 400;
+}
+
+.profile-profession {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.15);
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  margin: 0;
+}
+
+/* Profile Main Actions */
+.profile-main-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+/* Profile Action Buttons */
+.profile-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+}
+
+.profile-action-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #f1f5f9;
+}
+
+.profile-action-btn:active {
+  transform: scale(0.98);
+}
+
+.profile-action-btn.primary {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: white;
+}
+
+.profile-action-btn.primary:hover {
+  background: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.profile-action-btn.danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.profile-action-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fecaca;
+}
+
+.profile-action-btn.warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+}
+
+.profile-action-btn.warning:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #fde68a;
+}
+
+/* ============================================
+   PROFILE CARDS (About, Location, Skills, etc.)
+   ============================================ */
+
 .profile-card {
   background: rgba(30, 41, 59, 0.6);
   padding: 1.5rem;
@@ -258,6 +237,9 @@
 }
 
 .profile-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   color: #f1f5f9;
   font-size: 1rem;
   font-weight: 600;
@@ -316,6 +298,14 @@
   background: rgba(16, 185, 129, 0.12);
   color: #6ee7b7;
   border-color: rgba(16, 185, 129, 0.25);
+}
+
+.language-tag {
+  display: flex;
+  align-items: center;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.25);
 }
 
 /* Links */
@@ -408,11 +398,10 @@
   padding-right: 2.5rem;
 }
 
-.text-center {
-  text-align: center;
-}
+/* ============================================
+   FORM STYLES (Inside Modals)
+   ============================================ */
 
-/* Form Styles */
 .form-group {
   margin-bottom: 1.25rem;
 }
@@ -426,7 +415,8 @@
 }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
   width: 100%;
   padding: 0.75rem 1rem;
   border: 1px solid rgba(51, 65, 85, 0.6);
@@ -444,7 +434,8 @@
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
   outline: none;
   border-color: #6366f1;
   background: rgba(15, 23, 42, 0.8);
@@ -455,26 +446,356 @@
   min-height: 100px;
 }
 
+/* Form Actions Container */
 .form-actions {
   margin-top: 1.5rem;
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(51, 65, 85, 0.5);
 }
 
-/* Avatar Preview */
-.avatar-preview {
+/* ============================================
+   MODAL BUTTONS (Save, Cancel, Submit, etc.)
+   ============================================ */
+
+/* Base button style for all modal buttons */
+.form-actions button,
+.modal-content button[type="submit"],
+.modal-content button[type="button"],
+.modal-content .btn,
+.modal-content .save-btn,
+.modal-content .cancel-btn,
+.modal-content .submit-btn,
+.modal-content .upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  min-width: 120px;
+  border-radius: 8px;
+  font-size: 0.925rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+}
+
+.form-actions button:hover,
+.modal-content button[type="button"]:hover,
+.modal-content .btn:hover,
+.modal-content .cancel-btn:hover {
+  background: rgba(51, 65, 85, 0.6);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #f1f5f9;
+}
+
+.form-actions button:active,
+.modal-content button:active {
+  transform: scale(0.98);
+}
+
+.form-actions button:disabled,
+.modal-content button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Primary Button (Save, Submit, Upload) */
+.form-actions button[type="submit"],
+.form-actions .save-btn,
+.form-actions .submit-btn,
+.form-actions .upload-btn,
+.form-actions .primary-btn,
+.modal-content button[type="submit"],
+.modal-content .save-btn,
+.modal-content .submit-btn,
+.modal-content .upload-btn,
+.modal-content .primary-btn,
+.modal-content .btn-primary {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: white;
+}
+
+.form-actions button[type="submit"]:hover,
+.form-actions .save-btn:hover,
+.form-actions .submit-btn:hover,
+.form-actions .upload-btn:hover,
+.form-actions .primary-btn:hover,
+.modal-content button[type="submit"]:hover,
+.modal-content .save-btn:hover,
+.modal-content .submit-btn:hover,
+.modal-content .upload-btn:hover,
+.modal-content .primary-btn:hover,
+.modal-content .btn-primary:hover {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: white;
+}
+
+/* Secondary/Cancel Button */
+.form-actions .cancel-btn,
+.form-actions .secondary-btn,
+.modal-content .cancel-btn,
+.modal-content .secondary-btn,
+.modal-content .btn-secondary {
+  background: transparent;
+  border-color: rgba(148, 163, 184, 0.4);
+  color: #cbd5e1;
+}
+
+.form-actions .cancel-btn:hover,
+.form-actions .secondary-btn:hover,
+.modal-content .cancel-btn:hover,
+.modal-content .secondary-btn:hover,
+.modal-content .btn-secondary:hover {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.6);
+  color: #f1f5f9;
+}
+
+/* Danger Button */
+.form-actions .danger-btn,
+.form-actions .delete-btn,
+.modal-content .danger-btn,
+.modal-content .delete-btn,
+.modal-content .btn-danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.form-actions .danger-btn:hover,
+.form-actions .delete-btn:hover,
+.modal-content .danger-btn:hover,
+.modal-content .delete-btn:hover,
+.modal-content .btn-danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fecaca;
+}
+
+/* ============================================
+   AVATAR MODAL SPECIFIC
+   ============================================ */
+
+/* Avatar Preview in Modal */
+.avatar-preview,
+.avatar-modal-preview {
   width: 140px;
   height: 140px;
   border-radius: 50%;
   object-fit: cover;
-  margin: 1rem auto;
+  margin: 1.5rem auto;
   display: block;
   border: 3px solid rgba(99, 102, 241, 0.4);
   background: #0f172a;
 }
 
-/* Modal Scrollbar */
+/* File Input Styling */
+.avatar-upload-input,
+.file-input-wrapper input[type="file"] {
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(15, 23, 42, 0.6);
+  border: 2px dashed rgba(99, 102, 241, 0.4);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.avatar-upload-input:hover,
+.file-input-wrapper input[type="file"]:hover {
+  border-color: rgba(99, 102, 241, 0.7);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+/* Custom File Upload Button */
+.file-upload-btn,
+.choose-file-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.6);
+  border: 2px dashed rgba(99, 102, 241, 0.4);
+  border-radius: 8px;
+  color: #a5b4fc;
+  font-size: 0.925rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 1rem;
+}
+
+.file-upload-btn:hover,
+.choose-file-btn:hover {
+  border-color: rgba(99, 102, 241, 0.7);
+  background: rgba(99, 102, 241, 0.1);
+  color: #c7d2fe;
+}
+
+/* Upload Progress / Status Text */
+.upload-status,
+.file-name {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+/* ============================================
+   EDIT PROFILE MODAL SPECIFIC
+   ============================================ */
+
+.edit-profile-modal .form-group {
+  margin-bottom: 1rem;
+}
+
+.edit-profile-modal .form-actions {
+  margin-top: 1.5rem;
+}
+
+/* Section Dividers in Edit Modal */
+.form-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.form-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.form-section h4 {
+  color: #a5b4fc;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Multi-input Row */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 480px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tags Input (Skills, Interests, Languages) */
+.tags-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  border-radius: 8px;
+  min-height: 48px;
+}
+
+.tags-input-container input {
+  flex: 1;
+  min-width: 120px;
+  border: none;
+  background: transparent;
+  padding: 0.25rem;
+  color: #f1f5f9;
+  font-size: 0.9rem;
+}
+
+.tags-input-container input:focus {
+  outline: none;
+}
+
+.tags-input-container .tag {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(99, 102, 241, 0.2);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #a5b4fc;
+}
+
+.tags-input-container .tag button {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  min-width: unset;
+}
+
+.tags-input-container .tag button:hover {
+  color: #fca5a5;
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+.btn-loading,
+button.loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.btn-loading::after,
+button.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   MODAL SCROLLBAR
+   ============================================ */
+
 .modal-content::-webkit-scrollbar {
   width: 6px;
 }
@@ -489,93 +810,6 @@
 }
 
 /* ============================================
-   QUICK NAVIGATION
-   ============================================ */
-
-.quick-nav {
-  background: rgba(15, 23, 42, 0.9);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.quick-nav-container {
-  display: flex;
-  justify-content: flex-start;
-  gap: 0.5rem;
-  padding: 0.75rem 2rem;
-  overflow-x: auto;
-}
-
-.quick-nav-container::-webkit-scrollbar {
-  display: none;
-}
-
-.quick-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1rem;
-  text-decoration: none;
-  color: #94a3b8;
-  font-weight: 500;
-  font-size: 0.875rem;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  border: 1px solid transparent;
-}
-
-.quick-nav-item svg {
-  font-size: 1.1rem;
-  width: 1.1rem;
-  height: 1.1rem;
-}
-
-.nav-label {
-  font-size: 0.875rem;
-}
-
-.quick-nav-item:hover {
-  background: rgba(99, 102, 241, 0.1);
-  color: #c7d2fe;
-}
-
-.quick-nav-item.active {
-  background: #6366f1;
-  color: white;
-}
-
-/* Marketplace Badge */
-.marketplace-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.75rem;
-  padding: 0.5rem 1rem;
-  background: rgba(99, 102, 241, 0.12);
-  color: #a5b4fc;
-  border-radius: 8px;
-  text-decoration: none;
-  font-size: 0.85rem;
-  font-weight: 500;
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  transition: all 0.2s ease;
-}
-
-.marketplace-badge:hover {
-  background: rgba(99, 102, 241, 0.2);
-  border-color: rgba(99, 102, 241, 0.4);
-}
-
-.marketplace-badge svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* ============================================
    RESPONSIVE ADJUSTMENTS
    ============================================ */
 
@@ -584,13 +818,8 @@
     padding: 1.5rem 2rem;
   }
 
-  .profile-header {
-    flex-wrap: wrap;
-  }
-
-  .profile-actions {
-    width: 100%;
-    margin-top: 1rem;
+  .main-profile-card {
+    padding: 1.5rem;
   }
 }
 
@@ -599,42 +828,55 @@
     padding: 1rem;
   }
 
-  .profile-header-row {
-    flex-direction: column;
+  .main-profile-card {
+    padding: 1.25rem;
   }
 
-  .profile-logout-btn {
-    align-self: flex-end;
-    margin-top: 0;
-    margin-bottom: 1rem;
-  }
-
-  .profile-header {
+  .profile-main-top {
     flex-direction: column;
     text-align: center;
-    padding: 1.5rem;
-    gap: 1.25rem;
   }
 
-  .profile-info {
-    text-align: center;
+  .profile-main-info h2 {
+    font-size: 1.35rem;
   }
 
-  .profile-actions {
+  .profile-main-actions {
     justify-content: center;
   }
 
-  .display-name {
-    font-size: 1.5rem;
-  }
-
   .profile-avatar {
-    width: 100px;
-    height: 100px;
+    width: 90px;
+    height: 90px;
   }
 
-  .quick-nav-container {
-    padding: 0.75rem 1rem;
+  .avatar-edit-btn {
+    position: relative;
+    bottom: auto;
+    right: auto;
+    margin-top: 0.5rem;
+  }
+
+  .profile-avatar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Modal adjustments */
+  .modal-content {
+    padding: 1.5rem;
+    margin: 0.5rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions button,
+  .modal-content button {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -643,16 +885,16 @@
     padding: 0.75rem;
   }
 
-  .profile-header {
-    padding: 1.25rem;
+  .main-profile-card {
+    padding: 1rem;
+    gap: 1rem;
   }
 
-  .profile-avatar {
-    width: 90px;
-    height: 90px;
+  .profile-main-info h2 {
+    font-size: 1.2rem;
   }
 
-  .action-btn {
+  .profile-action-btn {
     padding: 0.5rem 1rem;
     font-size: 0.8rem;
   }
@@ -665,8 +907,30 @@
     font-size: 0.95rem;
   }
 
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+  }
+
   .modal-content {
-    padding: 1.5rem;
+    padding: 1.25rem;
+  }
+
+  .modal-content h2 {
+    font-size: 1.15rem;
+  }
+
+  .form-actions button,
+  .modal-content button {
+    padding: 0.7rem 1.25rem;
+    font-size: 0.875rem;
+    min-width: unset;
+  }
+
+  .avatar-preview,
+  .avatar-modal-preview {
+    width: 120px;
+    height: 120px;
   }
 }
 
@@ -681,3 +945,10 @@
 .hidden {
   display: none;
 }
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
