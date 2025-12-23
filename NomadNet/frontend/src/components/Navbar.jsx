@@ -1,14 +1,15 @@
 // src/components/Navbar.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
+import {
   FiShoppingBag,
   FiList,
   FiUser,
   FiMenu,
   FiX,
   FiLogOut,
-  FiMap
+  FiMap,
+  FiMessageSquare
 } from 'react-icons/fi';
 import '../styles/Navbar.css';
 
@@ -24,7 +25,7 @@ const Navbar = () => {
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     const userData = localStorage.getItem('user') || sessionStorage.getItem('user');
-    
+
     console.log('🔍 Navbar - Checking auth:', {
       hasToken: !!token,
       hasUserData: !!userData,
@@ -50,7 +51,7 @@ const Navbar = () => {
         navigate('/', { replace: true });
       }
     }
-    
+
     setLoading(false);
   }, [location.pathname, navigate]);
 
@@ -75,8 +76,8 @@ const Navbar = () => {
       return location.pathname === '/dashboard';
     }
     if (path === '/marketplace') {
-      return location.pathname.startsWith('/marketplace') && 
-             !location.pathname.includes('/my-listings');
+      return location.pathname.startsWith('/marketplace') &&
+        !location.pathname.includes('/my-listings');
     }
     return location.pathname === path;
   };
@@ -120,8 +121,8 @@ const Navbar = () => {
         </Link>
 
         {/* Mobile Menu Toggle */}
-        <button 
-          className="mobile-menu-toggle" 
+        <button
+          className="mobile-menu-toggle"
           onClick={toggleMenu}
           aria-label="Toggle menu"
         >
@@ -130,8 +131,8 @@ const Navbar = () => {
 
         {/* Navigation Links */}
         <div className={`navbar-links ${isMenuOpen ? 'active' : ''}`}>
-          <Link 
-            to="/dashboard" 
+          <Link
+            to="/dashboard"
             className={`nav-link ${isActive('/dashboard') ? 'active' : ''}`}
             onClick={closeMenu}
           >
@@ -139,8 +140,8 @@ const Navbar = () => {
             <span>Dashboard</span>
           </Link>
 
-          <Link 
-            to="/marketplace" 
+          <Link
+            to="/marketplace"
             className={`nav-link ${isActive('/marketplace') ? 'active' : ''}`}
             onClick={closeMenu}
           >
@@ -148,8 +149,17 @@ const Navbar = () => {
             <span>Marketplace</span>
           </Link>
 
-          <Link 
-            to="/marketplace/my-listings" 
+          <Link
+            to="/chat"
+            className={`nav-link ${isActive('/chat') ? 'active' : ''}`}
+            onClick={closeMenu}
+          >
+            <FiMessageSquare />
+            <span>Chat</span>
+          </Link>
+
+          <Link
+            to="/marketplace/my-listings"
             className={`nav-link ${isActive('/marketplace/my-listings') ? 'active' : ''}`}
             onClick={closeMenu}
           >
@@ -160,14 +170,14 @@ const Navbar = () => {
 
         {/* User Profile Dropdown */}
         <div className="navbar-profile" ref={profileRef}>
-          <button 
+          <button
             className="profile-trigger"
             onClick={() => setIsProfileOpen(!isProfileOpen)}
             aria-label="User menu"
           >
-            <img 
-              src={user.avatar} 
-              alt={user.displayName} 
+            <img
+              src={user.avatar}
+              alt={user.displayName}
               className="profile-avatar-small"
             />
             <span className="profile-name">{user.displayName}</span>
@@ -175,8 +185,8 @@ const Navbar = () => {
 
           {isProfileOpen && (
             <div className="profile-dropdown">
-              <Link 
-                to={`/profile/${user.username}`} 
+              <Link
+                to={`/profile/${user.username}`}
                 className="dropdown-item"
                 onClick={() => {
                   setIsProfileOpen(false);
@@ -189,7 +199,7 @@ const Navbar = () => {
 
               <hr className="dropdown-divider" />
 
-              <button 
+              <button
                 className="dropdown-item logout"
                 onClick={handleLogout}
               >

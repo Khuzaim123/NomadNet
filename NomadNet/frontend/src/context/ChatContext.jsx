@@ -41,6 +41,7 @@ export const ChatProvider = ({ children }) => {
   // Refs to track current state in callbacks
   const activeConversationRef = useRef(activeConversation);
   const messagesRef = useRef(messages);
+  const processedMessageIdsRef = useRef(new Set()); // Track processed message IDs to prevent duplicates
 
   // Keep refs in sync
   useEffect(() => {
@@ -98,45 +99,42 @@ export const ChatProvider = ({ children }) => {
     const handleNewMessage = (message) => {
       console.log('📥 Received new message:', message._id);
 
+      // First check: Have we already processed this exact message ID?
+      if (processedMessageIdsRef.current.has(message._id)) {
+        console.log('⚠️ Message already processed (tracked in ref), skipping:', message._id);
+        return;
+      }
+
       const currentConversation = activeConversationRef.current;
       const conversationId = message.conversation?._id || message.conversation;
+      const senderId = message.sender?._id || message.sender;
+
+      // CRITICAL FIX: Skip our own sent messages from socket
+      // They're already handled by the API response in sendMessage()
+      if (senderId === currentUserId) {
+        console.log('⚠️ Skipping own message from socket (already handled by API):', message._id);
+        return;
+      }
 
       // Check if message is for active conversation
       if (currentConversation && currentConversation._id === conversationId) {
         setMessages((prev) => {
-          // Prevent duplicates by ID
+          // Second check: Does this message ID already exist in state?
           if (prev.some((m) => m._id === message._id)) {
-            console.log('Message already exists (same ID), skipping');
+            console.log('⚠️ Message already exists in state, skipping:', message._id);
             return prev;
           }
 
-          // Check if message already exists (by ID or optimistic update)
-          const messageExists = prev.some((m) => m._id === message._id);
-          if (messageExists) {
-            console.log('Message already exists, skipping socket event');
-            return prev;
-          }
+          console.log('✅ Adding received message to state:', message._id);
 
-          // Prevent duplicates from own sent messages (optimistic update already added it)
-          const senderId = message.sender?._id || message.sender;
-          if (senderId === currentUserId) {
-            // Check if we have a pending message with same content and timestamp within 2 seconds
-            const hasPending = prev.some((m) =>
-              m.pending &&
-              m.content === message.content &&
-              Math.abs(new Date(m.createdAt) - new Date(message.createdAt)) < 2000
-            );
+          // Mark as processed BEFORE adding
+          processedMessageIdsRef.current.add(message._id);
 
-            if (hasPending) {
-              console.log('Own message already added optimistically, replacing pending with real');
-              // Replace pending message with real one
-              return prev.map((m) =>
-                m.pending && m.content === message.content ? message : m
-              );
-            }
-          }
+          // Clean up old message IDs after 10 seconds
+          setTimeout(() => {
+            processedMessageIdsRef.current.delete(message._id);
+          }, 10000);
 
-          console.log('Adding message to state');
           return [...prev, message];
         });
 
@@ -383,6 +381,16 @@ export const ChatProvider = ({ children }) => {
         // Send via API (which will also emit socket event)
         const response = await chatService.sendMessage(apiMessageData);
         const newMessage = response.data?.message || response.data;
+
+        console.log('💾 API returned message:', newMessage._id);
+
+        // CRITICAL: Mark this message as processed IMMEDIATELY to prevent socket duplicate
+        processedMessageIdsRef.current.add(newMessage._id);
+
+        // Clean up after 10 seconds
+        setTimeout(() => {
+          processedMessageIdsRef.current.delete(newMessage._id);
+        }, 10000);
 
         // Replace optimistic message with real one
         setMessages((prev) =>
