@@ -193,8 +193,6 @@ const UserSchema = new mongoose.Schema({
 // ⚡ Indexes
 // ======================
 UserSchema.index({ currentLocation: '2dsphere' }, { sparse: true });
-UserSchema.index({ username: 1 });
-UserSchema.index({ email: 1 });
 UserSchema.index({ currentCity: 1 });
 UserSchema.index({ isOnline: 1 });
 

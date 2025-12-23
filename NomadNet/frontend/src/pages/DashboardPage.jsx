@@ -23,6 +23,7 @@ import useGeolocation from '../hooks/useGeolocation';
 import socketService from '../services/socketService';
 import { getNearbyAll } from '../services/mapService';
 import { getToken } from '../utils/authUtils';
+import { generateDummyUsers } from '../services/dummyDataService';
 
 import '../styles/venuePage.css';
 import '../styles/dashboard.css';
@@ -114,8 +115,24 @@ const DashboardPage = () => {
           50
         );
 
+        // Generate dummy users near the current location
+        const dummyUsers = generateDummyUsers(
+          userLocation.longitude,
+          userLocation.latitude,
+          8, // Generate 8 dummy users
+          500 // Within 500 meters
+        );
+
+        // Merge dummy users with real users
+        const mergedData = {
+          ...data.data,
+          users: [...(data.data.users || []), ...dummyUsers]
+        };
+
+        console.log(`📍 Added ${dummyUsers.length} dummy users to the map`);
+
         // Expecting data.data = { users, venues, marketplace, checkIns }
-        setNearbyData(data.data);
+        setNearbyData(mergedData);
       } catch (error) {
         console.error('❌ Error fetching nearby data:', error);
       }
