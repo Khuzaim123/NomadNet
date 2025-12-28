@@ -6,6 +6,7 @@ import { getCurrentUser, logout as logoutService } from '../services/authService
 import ProfileDetails from '../components/ProfileDetails';
 import EditProfileModal from '../components/EditProfileModal';
 import AvatarUploadModal from '../components/AvatarUploadModal';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 import Spinner from '../components/Spinner';
 
 import '../styles/profile.css';
@@ -22,6 +23,7 @@ const ProfilePage = () => {
 
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [isAvatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
 
   // Fetch current logged-in user
   useEffect(() => {
@@ -113,8 +115,8 @@ const ProfilePage = () => {
         console.error('❌ Error fetching user:', err);
         setError(
           err.response?.data?.message ||
-            err.message ||
-            'Failed to fetch user profile.'
+          err.message ||
+          'Failed to fetch user profile.'
         );
         if (err.response?.status === 404) {
           setTimeout(() => navigate('/not-found'), 1000);
@@ -177,6 +179,19 @@ const ProfilePage = () => {
     setAvatarModalOpen(false);
   };
 
+  const handleChangePasswordModalOpen = () => {
+    setChangePasswordModalOpen(true);
+  };
+
+  const handleChangePasswordModalClose = () => {
+    setChangePasswordModalOpen(false);
+  };
+
+  const handlePasswordChangeSuccess = () => {
+    // Optionally show a success message or perform any actions after password change
+    console.log('✅ Password changed successfully!');
+  };
+
   // 🔐 Logout handler
   const handleLogout = async () => {
     try {
@@ -230,6 +245,7 @@ const ProfilePage = () => {
         isOwner={isOwner}
         onEditProfile={handleEditModalOpen}
         onAvatarClick={handleAvatarModalOpen}
+        onChangePassword={handleChangePasswordModalOpen}
         onLogout={handleLogout}
         onBlock={handleBlock}
         onReport={handleReport}
@@ -249,6 +265,13 @@ const ProfilePage = () => {
           user={user}
           onClose={handleAvatarModalClose}
           onAvatarUpdate={handleProfileUpdate}
+        />
+      )}
+
+      {isChangePasswordModalOpen && (
+        <ChangePasswordModal
+          onClose={handleChangePasswordModalClose}
+          onSuccess={handlePasswordChangeSuccess}
         />
       )}
     </div>
