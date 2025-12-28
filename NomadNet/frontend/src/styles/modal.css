@@ -149,29 +149,45 @@
     box-sizing: border-box;
 }
 
+/* Eye icon button inside password field */
 .password-toggle-btn {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none !important;
-    border: none;
-    color: #9ca3af;
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.2s;
-    height: auto;
-    width: auto;
+  position: absolute;
+  right: -30px;
+  top: 40%;
+  transform: translateY(-50%) !important; /* always vertically centered */
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  cursor: pointer;
+  height: auto;
+  width: auto;
+  outline: none;
 }
 
-.password-toggle-btn:hover {
-    color: #4b5563;
-    background: none !important;
+/* Ensure global button:hover / focus styles don't move or box it */
+.password-toggle-btn:hover,
+.password-toggle-btn:focus,
+.password-toggle-btn:active {
+  background: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  transform: translateY(-50%) !important;
+  color: #4b5563;
+  outline: none;
 }
 
+/* Optional: control icon size explicitly */
+.password-toggle-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
 /* Password Strength Indicator */
 .password-strength {
     margin-top: 8px;
