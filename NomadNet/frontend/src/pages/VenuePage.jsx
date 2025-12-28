@@ -1,12 +1,12 @@
 // src/pages/venues/VenuesPage.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  MapPin, 
-  List, 
-  Map, 
-  Plus, 
-  Search, 
+import {
+  MapPin,
+  List,
+  Map,
+  Plus,
+  Search,
   Filter,
   Loader,
   RefreshCw,
@@ -16,6 +16,7 @@ import VenueCard from '../components/venues/VenueCard';
 import VenueMap from '../components/venues/VenueMap';
 import VenueFilters from '../components/venues/VenueFilters';
 import { useVenues, useCategories } from '../hooks/useVenues';
+import useGeolocation from '../hooks/useGeolocation';
 import '../styles/venuePage.css';
 
 const VenuesPage = () => {
@@ -24,45 +25,35 @@ const VenuesPage = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(false);
 
-  const { 
-    venues, 
-    loading, 
-    error, 
-    filters, 
-    setFilters, 
+  const {
+    venues,
+    loading,
+    error,
+    filters,
+    setFilters,
     refetch,
-    fetchNearbyVenues 
+    fetchNearbyVenues
   } = useVenues();
-  
+
   const { categories } = useCategories();
 
-  // Get user location
-  const getUserLocation = useCallback(() => {
-    setLocationLoading(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          };
-          setUserLocation(location);
-          setLocationLoading(false);
-        },
-        (error) => {
-          console.error('Location error:', error);
-          setLocationLoading(false);
-        },
-        { enableHighAccuracy: true }
-      );
-    }
-  }, []);
+  // Use same geolocation hook as DashboardPage
+  const {
+    location,
+    loading: geoLoading,
+    error: geoError
+  } = useGeolocation({ watch: true });
 
+  // Update userLocation when geolocation changes (same as DashboardPage)
   useEffect(() => {
-    getUserLocation();
-  }, [getUserLocation]);
+    if (location) {
+      setUserLocation({
+        longitude: location.longitude,
+        latitude: location.latitude
+      });
+    }
+  }, [location]);
 
   // Search nearby when location is available
   const handleSearchNearby = () => {
@@ -74,7 +65,7 @@ const VenuesPage = () => {
   };
 
   // Filter venues by search query
-  const filteredVenues = venues.filter(venue => 
+  const filteredVenues = venues.filter(venue =>
     venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     venue.address?.city?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -131,7 +122,7 @@ const VenuesPage = () => {
             <button
               className="control-btn"
               onClick={handleSearchNearby}
-              disabled={!userLocation || locationLoading}
+              disabled={!userLocation || geoLoading}
             >
               <Navigation size={18} />
               Nearby

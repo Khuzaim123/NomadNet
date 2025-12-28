@@ -7,6 +7,8 @@ import {
   register,
   verifyOTP,
   resendOTP,
+  forgotPassword,
+  resetPassword,
   getCurrentUser,
   storeAuth,
   getToken,
@@ -19,6 +21,8 @@ const AuthPage = () => {
   // State management
   const [isLogin, setIsLogin] = useState(true);
   const [showOTPVerification, setShowOTPVerification] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState(1); // 1: email, 2: OTP, 3: new password
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState({ show: false, message: '', type: '' });
 
@@ -44,6 +48,15 @@ const AuthPage = () => {
   const [otpData, setOtpData] = useState({
     email: '',
     otp: '',
+    resendCooldown: 0
+  });
+
+  // Forgot password state
+  const [forgotPasswordData, setForgotPasswordData] = useState({
+    email: '',
+    otp: '',
+    newPassword: '',
+    confirmPassword: '',
     resendCooldown: 0
   });
 
@@ -77,10 +90,10 @@ const AuthPage = () => {
     try {
       const response = await getCurrentUser(token);
       console.log('🔍 Token verification response:', response);
-      
+
       // Handle multiple possible response structures
       const user = response?.data?.user || response?.user || response?.data || response;
-      
+
       if (user?.username) {
         console.log('✅ Redirecting to profile:', user.username);
         navigate(`/profile/${user.username}`);
@@ -124,6 +137,16 @@ const AuthPage = () => {
       return () => clearTimeout(timer);
     }
   }, [otpData.resendCooldown]);
+
+  // Forgot password resend cooldown
+  useEffect(() => {
+    if (forgotPasswordData.resendCooldown > 0) {
+      const timer = setTimeout(() => {
+        setForgotPasswordData(prev => ({ ...prev, resendCooldown: prev.resendCooldown - 1 }));
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [forgotPasswordData.resendCooldown]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -382,6 +405,110 @@ const AuthPage = () => {
     setShowPassword(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
+  // Forgot Password Handlers
+  const handleForgotPasswordRequest = async (e) => {
+    e.preventDefault();
+
+    if (!forgotPasswordData.email) {
+      showAlert('Please enter your email address', 'error');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(forgotPasswordData.email)) {
+      showAlert('Please enter a valid email address', 'error');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await forgotPassword(forgotPasswordData.email);
+      showAlert(response.message || 'Password reset OTP sent! Check your email.', 'success');
+      setForgotPasswordStep(2);
+      setForgotPasswordData(prev => ({ ...prev, resendCooldown: 60 }));
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      showAlert(error.message || 'Failed to send reset email. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendResetOTP = async () => {
+    if (forgotPasswordData.resendCooldown > 0) {
+      showAlert(`Please wait ${forgotPasswordData.resendCooldown} seconds before resending`, 'error');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await forgotPassword(forgotPasswordData.email);
+      showAlert(response.message || 'OTP sent successfully! Please check your email.', 'success');
+      setForgotPasswordData(prev => ({ ...prev, resendCooldown: 60 }));
+    } catch (error) {
+      console.error('Resend reset OTP error:', error);
+      showAlert(error.message || 'Failed to resend OTP. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+
+    const { otp, newPassword, confirmPassword } = forgotPasswordData;
+
+    if (!otp || otp.length !== 6) {
+      showAlert('Please enter a valid 6-digit OTP', 'error');
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      showAlert('Password must be at least 8 characters', 'error');
+      return;
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    if (!passwordRegex.test(newPassword)) {
+      showAlert(
+        'Password must contain:\n' +
+        '• At least 1 uppercase letter (A-Z)\n' +
+        '• At least 1 lowercase letter (a-z)\n' +
+        '• At least 1 number (0-9)\n' +
+        '• At least 1 special character (@$!%*?&)',
+        'error'
+      );
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showAlert('Passwords do not match', 'error');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await resetPassword(forgotPasswordData.email, otp, newPassword);
+      showAlert('Password reset successful! Please login with your new password.', 'success');
+
+      setTimeout(() => {
+        setShowForgotPassword(false);
+        setForgotPasswordStep(1);
+        setIsLogin(true);
+        setLoginData({ email: forgotPasswordData.email, password: '', rememberMe: false });
+        setForgotPasswordData({ email: '', otp: '', newPassword: '', confirmPassword: '', resendCooldown: 0 });
+      }, 2000);
+    } catch (error) {
+      console.error('Reset password error:', error);
+      showAlert(error.message || 'Failed to reset password. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // OTP Verification Screen
   if (showOTPVerification) {
     return (
@@ -478,6 +605,276 @@ const AuthPage = () => {
     );
   }
 
+
+  // Forgot Password Screen
+  if (showForgotPassword) {
+    return (
+      <div className="container">
+        <div className="bg-animation">
+          <div className="circle circle-1"></div>
+          <div className="circle circle-2"></div>
+          <div className="circle circle-3"></div>
+        </div>
+
+        <div className="auth-card">
+          <div className="brand">
+            <div className="logo">
+              <img src={logo} alt="Nomad Net Logo" />
+            </div>
+            <h1>Reset Password</h1>
+            <p className="tagline">
+              {forgotPasswordStep === 1 && "We'll send you a reset code"}
+              {forgotPasswordStep === 2 && `Enter the OTP sent to ${forgotPasswordData.email}`}
+              {forgotPasswordStep === 3 && "Create your new password"}
+            </p>
+          </div>
+
+          {/* Step 1: Email Entry */}
+          {forgotPasswordStep === 1 && (
+            <form onSubmit={handleForgotPasswordRequest} className="auth-form active">
+              <h2>Forgot Password?</h2>
+              <p className="subtitle">Enter your email to receive a reset code</p>
+
+              {alert.show && (
+                <div className={`alert ${alert.type}`}>
+                  {alert.message}
+                </div>
+              )}
+
+              <div className="input-group">
+                <label htmlFor="forgotEmail">Email Address</label>
+                <div className="input-wrapper">
+                  <svg className="input-icon" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 4H20C21.1 4 22 4.9 22 6V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V6C2 4.9 2.9 4 4 4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M22 6L12 13L2 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <input
+                    type="email"
+                    id="forgotEmail"
+                    placeholder="your@email.com"
+                    value={forgotPasswordData.email}
+                    onChange={(e) => setForgotPasswordData({ ...forgotPasswordData, email: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                <span className="btn-text" style={{ display: loading ? 'none' : 'block' }}>Send Reset Code</span>
+                <span className="btn-loader" style={{ display: loading ? 'block' : 'none' }}>
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="4" fill="none" strokeLinecap="round" />
+                  </svg>
+                </span>
+              </button>
+
+              <p className="switch-form">
+                Remember your password?
+                <a href="#" onClick={(e) => {
+                  e.preventDefault();
+setShowForgotPassword(false);
+                  setIsLogin(true);
+                }}>Back to login</a>
+              </p>
+            </form>
+          )}
+
+          {/* Step 2: OTP Verification */}
+          {forgotPasswordStep === 2 && (
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setForgotPasswordStep(3);
+            }} className="auth-form active">
+              <h2>Verify OTP</h2>
+              <p className="subtitle">Check your inbox for the 6-digit code</p>
+
+              {alert.show && (
+                <div className={`alert ${alert.type}`}>
+                  {alert.message}
+                </div>
+              )}
+
+              <div className="input-group">
+                <label htmlFor="forgotOtp">Enter OTP</label>
+                <div className="input-wrapper">
+                  <input
+                    type="text"
+                    id="forgotOtp"
+                    placeholder="000000"
+                    value={forgotPasswordData.otp}
+                    onChange={(e) => setForgotPasswordData({ ...forgotPasswordData, otp: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                    maxLength="6"
+                    style={{
+                      fontSize: '24px',
+                      textAlign: 'center',
+                      letterSpacing: '8px',
+                      fontWeight: 'bold'
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="btn btn-primary">
+                <span className="btn-text">Continue</span>
+              </button>
+
+              <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                <p>Didn't receive the code?</p>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={handleResendResetOTP}
+                  disabled={forgotPasswordData.resendCooldown > 0 || loading}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: forgotPasswordData.resendCooldown > 0 ? '#999' : '#6366f1',
+                    cursor: forgotPasswordData.resendCooldown > 0 ? 'not-allowed' : 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  {forgotPasswordData.resendCooldown > 0
+                    ? `Resend in ${forgotPasswordData.resendCooldown}s`
+                    : 'Resend OTP'
+                  }
+                </button>
+              </div>
+
+              <p className="switch-form">
+                Want to use a different email?
+                <a href="#" onClick={(e) => {
+                  e.preventDefault();
+                  setForgotPasswordStep(1);
+                }}>Go back</a>
+              </p>
+            </form>
+          )}
+
+          {/* Step 3: New Password */}
+          {forgotPasswordStep === 3 && (
+            <form onSubmit={handleResetPassword} className="auth-form active">
+              <h2>Create New Password</h2>
+              <p className="subtitle">Enter your new password</p>
+
+              {alert.show && (
+                <div className={`alert ${alert.type}`}>
+                  {alert.message}
+                </div>
+              )}
+
+              <div className="input-group">
+                <label htmlFor="newPassword">New Password</label>
+                <div className="input-wrapper">
+                  <svg className="input-icon" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+                    <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                  <input
+                    type={showPassword.signup ? "text" : "password"}
+                    id="newPassword"
+                    placeholder="••••••••"
+                    value={forgotPasswordData.newPassword}
+                    onChange={(e) => {
+                      setForgotPasswordData({ ...forgotPasswordData, newPassword: e.target.value });
+                      checkPasswordStrength(e.target.value);
+                    }}
+                    minLength="8"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => togglePasswordVisibility('signup')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none">
+                      {showPassword.signup ? (
+                        <>
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="currentColor" strokeWidth="2" />
+                          <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="2" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" strokeWidth="2" />
+                          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                        </>
+                      )}
+                    </svg>
+                  </button>
+                </div>
+                <div className="password-strength">
+                  <div className="strength-bar">
+                    <div className={`strength-fill ${passwordStrength.level}`}></div>
+                  </div>
+                  <span className="strength-text">{passwordStrength.text}</span>
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label htmlFor="confirmNewPassword">Confirm Password</label>
+                <div className="input-wrapper">
+                  <svg className="input-icon" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+                    <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                  <input
+                    type={showPassword.confirm ? "text" : "password"}
+                    id="confirmNewPassword"
+                    placeholder="••••••••"
+                    value={forgotPasswordData.confirmPassword}
+                    onChange={(e) => setForgotPasswordData({ ...forgotPasswordData, confirmPassword: e.target.value })}
+                    minLength="8"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => togglePasswordVisibility('confirm')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none">
+                      {showPassword.confirm ? (
+                        <>
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="currentColor" strokeWidth="2" />
+                          <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="2" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" strokeWidth="2" />
+                          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                        </>
+                      )}
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                <span className="btn-text" style={{ display: loading ? 'none' : 'block' }}>Reset Password</span>
+                <span className="btn-loader" style={{ display: loading ? 'block' : 'none' }}>
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="4" fill="none" strokeLinecap="round" />
+                  </svg>
+                </span>
+              </button>
+
+              <p className="switch-form">
+                Remember your password?
+                <a href="#" onClick={(e) => {
+                  e.preventDefault();
+                  setShowForgotPassword(false);
+                  setIsLogin(true);
+                }}>Back to login</a>
+              </p>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+
   return (
     <div className="container">
       <div className="bg-animation">
@@ -570,7 +967,12 @@ const AuthPage = () => {
                 />
                 <span>Remember me</span>
               </label>
-              <a href="#" className="link">Forgot password?</a>
+              <a href="#" className="link" onClick={(e) => {
+                e.preventDefault();
+                setShowForgotPassword(true);
+                setForgotPasswordStep(1);
+                setForgotPasswordData({ email: loginData.email, otp: '', newPassword: '', confirmPassword: '', resendCooldown: 0 });
+              }}>Forgot password?</a>
             </div>
 
             <button type="submit" className="btn btn-primary" disabled={loading}>
