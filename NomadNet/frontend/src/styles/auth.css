@@ -35,15 +35,13 @@ body {
    =================================== */
 .container {
   min-height: 100vh;
-  width: 100vw;
+  width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-  position: fixed;
-  top: 0;
-  left: 0;
-  overflow-y: auto;
+  position: relative;            /* CHANGED: was fixed */
+  overflow-y: auto;              /* page scrolls, not the card */
   padding: 20px;
 }
 
@@ -106,7 +104,7 @@ body {
 }
 
 /* ===================================
-   🎴 AUTH CARD - COMPACT
+   🎴 AUTH CARD
    =================================== */
 .auth-card {
   background: rgba(30, 41, 59, 0.95);
@@ -116,15 +114,16 @@ body {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 440px;
-  padding: 32px;
+  max-width: 460px;               /* WIDER CARD */
+  padding: 28px 32px;             /* slightly less vertical padding */
   border: 1px solid rgba(51, 65, 85, 0.6);
   animation: slideUp 0.5s ease-out;
-  max-height: 85vh;
-  overflow-y: auto;
+  /* REMOVE internal scroll */
+  max-height: none;
+  overflow-y: visible;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar (no longer used on card, but harmless) */
 .auth-card::-webkit-scrollbar {
   width: 6px;
 }
@@ -155,11 +154,11 @@ body {
 }
 
 /* ===================================
-   🎯 BRANDING - COMPACT
+   🎯 BRANDING
    =================================== */
 .brand {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
 .logo {
@@ -193,7 +192,7 @@ body {
 }
 
 /* ===================================
-   📝 FORM STYLES - COMPACT
+   📝 FORM STYLES
    =================================== */
 .auth-form {
   animation: fadeIn 0.3s ease-in;
@@ -209,23 +208,19 @@ body {
 .auth-form .subtitle {
   color: var(--text-secondary);
   font-size: 13px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ===================================
-   🔤 INPUT GROUPS - COMPACT
+   🔤 INPUT GROUPS
    =================================== */
 .input-group {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .input-group label {
@@ -233,7 +228,7 @@ body {
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 500;
-  margin-bottom: 6px;
+  margin-bottom: 8px;  /* MORE SPACE above input */
   text-align: left;
 }
 
@@ -243,9 +238,12 @@ body {
   align-items: center;
 }
 
+/* ICONS: vertically centered */
 .input-icon {
   position: absolute;
   left: 14px;
+  top: 50%;                     /* NEW */
+  transform: translateY(-50%);  /* NEW */
   width: 18px;
   height: 18px;
   color: var(--text-secondary);
@@ -253,9 +251,10 @@ body {
   z-index: 1;
 }
 
+/* Shorter input height via padding */
 .input-wrapper input {
   width: 100%;
-  padding: 11px 14px 11px 44px;
+  padding: 8px 14px 8px 44px;   /* LESS VERTICAL padding */
   background: rgba(15, 23, 42, 0.6);
   border: 1.5px solid var(--border);
   border-radius: 10px;
@@ -275,9 +274,12 @@ body {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
+/* Eye icon: vertically centered */
 .toggle-password {
   position: absolute;
   right: 14px;
+  top: 50%;                     /* NEW */
+  transform: translateY(-50%);  /* NEW */
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -285,6 +287,7 @@ body {
   padding: 4px;
   display: flex;
   align-items: center;
+  justify-content: center;
   transition: color 0.3s;
   z-index: 2;
 }
@@ -299,7 +302,7 @@ body {
 }
 
 /* ===================================
-   💪 PASSWORD STRENGTH - COMPACT
+   💪 PASSWORD STRENGTH
    =================================== */
 .password-strength {
   margin-top: 6px;
@@ -346,13 +349,13 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   font-size: 13px;
 }
 
 .checkbox {
   display: flex;
-  align-items: center;
+  align-items: center;  /* center text and checkbox */
   cursor: pointer;
   color: var(--text-secondary);
   font-size: 13px;
@@ -364,6 +367,9 @@ body {
   width: 15px;
   height: 15px;
   accent-color: var(--primary);
+  flex-shrink: 0;
+  position: relative;
+  top: -1px;  /* tiny nudge up to look perfectly centered */
 }
 
 .link {
@@ -379,11 +385,11 @@ body {
 }
 
 /* ===================================
-   🔘 BUTTONS - COMPACT
+   🔘 BUTTONS
    =================================== */
 .btn {
   width: 100%;
-  padding: 12px 20px;
+  padding: 10px 20px;           /* LESS HEIGHT */
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
@@ -431,7 +437,7 @@ body {
 }
 
 /* ===================================
-   🔗 SOCIAL BUTTONS - COMPACT
+   🔗 SOCIAL BUTTONS - (unused but kept)
    =================================== */
 .divider {
   display: flex;
@@ -489,7 +495,7 @@ body {
 }
 
 /* ===================================
-   🚨 ALERTS - COMPACT
+   🚨 ALERTS
    =================================== */
 .alert {
   padding: 10px 14px;
@@ -560,8 +566,8 @@ body {
 /* Tablet */
 @media (max-width: 768px) {
   .auth-card {
-    padding: 28px;
-    max-width: 400px;
+    padding: 24px 24px;
+    max-width: 480px;  /* still wider than original */
   }
 
   .brand h1 {
@@ -590,13 +596,13 @@ body {
   }
 
   .auth-card {
-    padding: 24px 18px;
+    padding: 22px 18px;
     border-radius: 18px;
-    max-height: 92vh;
+    max-height: none;
   }
 
   .brand {
-    margin-bottom: 20px;
+    margin-bottom: 18px;
   }
 
   .brand h1 {
@@ -628,16 +634,16 @@ body {
   }
 
   .input-group {
-    margin-bottom: 14px;
+    margin-bottom: 12px;
   }
 
   .input-group label {
     font-size: 12px;
-    margin-bottom: 5px;
+    margin-bottom: 6px;
   }
 
   .input-wrapper input {
-    padding: 10px 12px 10px 40px;
+    padding: 8px 12px 8px 40px;
     font-size: 13px;
   }
 
@@ -657,7 +663,7 @@ body {
   }
 
   .btn {
-    padding: 11px 18px;
+    padding: 10px 18px;
     font-size: 13px;
   }
 
@@ -699,7 +705,7 @@ body {
 /* Small mobile */
 @media (max-width: 360px) {
   .auth-card {
-    padding: 20px 16px;
+    padding: 18px 16px;
   }
 
   .brand h1 {
@@ -711,7 +717,7 @@ body {
   }
 
   .input-wrapper input {
-    padding: 9px 10px 9px 38px;
+    padding: 8px 10px 8px 38px;
   }
 }
 
@@ -722,8 +728,8 @@ body {
   }
 
   .auth-card {
-    max-width: 460px;
-    padding: 36px;
+    max-width: 420px;  /* wider on desktop */
+    padding: 30px 36px;
   }
 
   .auth-card:hover {
@@ -749,8 +755,8 @@ body {
 /* Very large screens */
 @media (min-width: 1440px) {
   .auth-card {
-    max-width: 480px;
-    padding: 40px;
+    max-width: 640px;
+    padding: 32px 40px;
   }
 }
 
@@ -810,8 +816,10 @@ body {
 
 /* Password requirements compact style */
 .input-group div[style*="fontSize: '12px'"] {
-  font-size: 11px !important;
+  font-size: 11px !important;             /* smaller */
   margin-top: 6px;
+  color: var(--text-secondary);           /* use your muted text color */
+  background: transparent !important;     /* ensure no white box */
 }
 
 .input-group div[style*="fontSize: '12px'"] > div:first-child {
@@ -821,8 +829,144 @@ body {
 }
 
 .input-group div[style*="display: flex"] span {
-  font-size: 10px !important;
+  font-size: 10px !important;             /* smaller tags */
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(15, 23, 42, 0.5);      /* dark translucent, not white */
+}
+/* ==============================
+   AUTH ICON & CHECKBOX ALIGNMENT OVERRIDES
+   ============================== */
+
+/* Make all auth inputs have a fixed height and vertically centered content */
+.auth-card .input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 40px; /* consistent input height */
+}
+
+/* Remove extra margin from global input styles and center text vertically */
+.auth-card .input-wrapper input {
+  height: 100%;
+  padding: 0 14px 0 44px; /* equal top/bottom padding, space for icon on left */
+  margin-bottom: 0;       /* override index.css global margin-bottom */
+}
+
+/* Left icons: perfectly centered vertically and sized correctly */
+.auth-card .input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Ensure SVG inside icons respects our size (overrides svg { width:1em; ... } in index.css) */
+.auth-card .input-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* Eye (password toggle) icon: centered vertically on the right */
+.auth-card .toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.auth-card .toggle-password svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* Final checkbox alignment fix for auth card */
+.auth-card .checkbox {
+  display: flex;
+  align-items: center;      /* center items vertically in the flex row */
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.auth-card .checkbox input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin-right: 8px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+  position: relative;
+  top: 0;                   /* reset any previous nudges */
+}
+
+.auth-card .checkbox span {
+  line-height: 1;           /* tighter line box for text */
+  position: relative;
+  bottom: 10px;                 /* tiny nudge down so box and text look perfectly aligned */
+}
+/* ==============================
+   Compact spacing for auth card
+   ============================== */
+
+/* Reduce overall padding slightly */
+.auth-card {
+  padding: 24px 26px; /* was ~32px; adjust to taste */
+}
+
+/* Less space under the logo/title area */
+.auth-card .brand {
+  margin-bottom: 16px; /* was 24px */
+}
+
+/* Tighten heading + subtitle spacing */
+.auth-card .auth-form h2 {
+  margin-bottom: 4px; /* was 6px */
+}
+
+.auth-card .auth-form .subtitle {
+  margin-bottom: 14px; /* was 18–20px */
+}
+
+/* Less vertical space between fields */
+.auth-card .input-group {
+  margin-bottom: 10px; /* was 14–16px */
+}
+
+/* Override global form gap from index.css */
+.auth-card form {
+  gap: 0.5rem; /* was 1rem from index.css */
+}
+
+/* Compact alert spacing */
+.auth-card .alert {
+  margin-bottom: 10px; /* was 16px */
+}
+
+/* Compact remember/forgot row */
+.auth-card .form-options {
+  margin-bottom: 12px; /* was 18–20px */
+}
+
+/* Compact switch form text at bottom */
+.auth-card .switch-form {
+  margin-top: 12px;  /* was 18px */
+  padding-top: 10px; /* if you want a very small separation */
 }

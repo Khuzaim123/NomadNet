@@ -6,9 +6,7 @@ import {
   List,
   Map as MapIcon,
   Search,
-  Filter as FilterIcon,
   Loader,
-  RefreshCw,
   Navigation
 } from 'lucide-react';
 
@@ -16,8 +14,7 @@ import MapContainer from '../components/Dashboard/MapContainer';
 import DetailDrawer from '../components/Dashboard/DetailDrawer';
 
 import VenueCard from '../components/venues/VenueCard';
-import VenueFilters from '../components/venues/VenueFilters';
-import { useVenues, useCategories } from '../hooks/useVenues';
+import { useVenues } from '../hooks/useVenues';
 import useGeolocation from '../hooks/useGeolocation';
 
 import socketService from '../services/socketService';
@@ -33,20 +30,14 @@ const DashboardPage = () => {
 
   // ---------- Venues UI state ----------
   const [viewMode, setViewMode] = useState('map'); // 'map' or 'grid'
-  const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const {
     venues,
     loading: venuesLoading,
     error,
-    filters,
-    setFilters,
-    refetch,
-    fetchNearbyVenues
+    refetch
   } = useVenues();
-
-  const { categories } = useCategories();
 
   // ---------- Location via useGeolocation ----------
   const [userLocation, setUserLocation] = useState(null);
@@ -68,8 +59,7 @@ const DashboardPage = () => {
     } else if (geoError) {
       console.error('❌ Geolocation error:', geoError);
       setLocationError(geoError);
-      // Don't set a fallback location - let userLocation remain null
-      // This ensures we only show venues when we have the user's REAL location
+      // Let userLocation remain null if no permission
     }
   }, [location, geoError]);
 
@@ -94,16 +84,15 @@ const DashboardPage = () => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // AFTER
-useEffect(() => {
-  if (!userLocation) return;
+  useEffect(() => {
+    if (!userLocation) return;
 
-  const fetchNearbyData = async () => {
-    try {
-      const types = Object.keys(mapFilters)
-        .filter(key => mapFilters[key])
-        .map(key => (key === 'checkIns' ? 'checkins' : key))
-        .join(',');
+    const fetchNearbyData = async () => {
+      try {
+        const types = Object.keys(mapFilters)
+          .filter(key => mapFilters[key])
+          .map(key => (key === 'checkIns' ? 'checkins' : key))
+          .join(',');
 
         const data = await getNearbyAll(
           userLocation.longitude,
@@ -117,19 +106,18 @@ useEffect(() => {
         const dummyUsers = generateDummyUsers(
           userLocation.longitude,
           userLocation.latitude,
-          8, // Generate 8 dummy users
-          500 // Within 500 meters
+          8,   // 8 dummy users
+          500  // within 500m
         );
 
         // Generate dummy venues near the current location
         const dummyVenues = generateDummyVenues(
           userLocation.longitude,
           userLocation.latitude,
-          12, // Generate 12 dummy venues
-          1000 // Within 1000 meters
+          12,   // 12 dummy venues
+          1000  // within 1000m
         );
 
-        // Merge dummy users and venues with real data
         const mergedData = {
           ...data.data,
           users: [...(data.data.users || []), ...dummyUsers],
@@ -139,15 +127,15 @@ useEffect(() => {
         console.log(`📍 Added ${dummyUsers.length} dummy users to the map`);
         console.log(`🏢 Added ${dummyVenues.length} dummy venues to the map`);
 
-        // Expecting data.data = { users, venues, marketplace, checkIns }
         setNearbyData(mergedData);
       } catch (error) {
         console.error('❌ Error fetching nearby data:', error);
       }
     };
 
-  fetchNearbyData();
-}, [userLocation, radius, mapFilters, filters]);
+    fetchNearbyData();
+  }, [userLocation, radius, mapFilters]);
+
   // ---------- Socket.IO for realtime updates ----------
   useEffect(() => {
     if (!userLocation) return;
@@ -276,25 +264,14 @@ useEffect(() => {
   const handleViewProfile = username => navigate(`/profile/${username}`);
   const handleVenueClick = venueId => handleViewVenue(venueId);
 
-  // "Nearby" for the Venues list hook
-  const handleSearchNearby = () => {
-    if (userLocation) {
-      fetchNearbyVenues(userLocation.longitude, userLocation.latitude, {
-        radius: filters.radius || 5000
-      });
-    }
-  };
-
   // Filter venues list by search
   const filteredVenues = venues.filter(
     venue =>
       venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      venue.address?.city
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase())
+      venue.address?.city?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Same UX as before: show "Getting your location...\" until geolocation finishes
+  // Show "Getting your location..." until geolocation finishes
   if (loading) {
     return (
       <div className="dashboard-loading">
@@ -323,12 +300,9 @@ useEffect(() => {
               Discover Places
             </h1>
             <p>
-              Find the best spots to work, meet, and connect with fellow
-              nomads
+              Find the best spots to work, meet, and connect with fellow nomads
             </p>
           </div>
-
-          {/* Removed "Add Venue" button – venues are read-only now */}
         </div>
 
         {/* Search + controls */}
@@ -345,27 +319,6 @@ useEffect(() => {
           </div>
 
           <div className="control-buttons">
-            <button
-              className={`control-btn ${showFilters ? 'active' : ''}`}
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <FilterIcon size={18} />
-              Filters
-            </button>
-
-            <button
-              className="control-btn"
-              onClick={handleSearchNearby}
-              disabled={!userLocation || loading}
-            >
-              <Navigation size={18} />
-              Nearby
-            </button>
-
-            <button className="control-btn" onClick={refetch}>
-              <RefreshCw size={18} />
-            </button>
-
             <div className="view-toggle">
               <button
                 className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
@@ -384,24 +337,13 @@ useEffect(() => {
         </div>
       </header>
 
-      {/* Venues filters panel */}
-      {showFilters && (
-        <VenueFilters
-          filters={filters}
-          setFilters={setFilters}
-          categories={categories}
-          onClose={() => setShowFilters(false)}
-        />
-      )}
-
       {/* Main content */}
       <main className="venues-content">
         {viewMode === 'map' ? (
           <>
             {locationError && (
               <div className="location-warning">
-                ⚠️ Using default location. Enable location services for
-                accurate results.
+                ⚠️ Using default location. Enable location services for accurate results.
               </div>
             )}
 
@@ -473,10 +415,7 @@ useEffect(() => {
                     <div className="empty-state">
                       <MapPin size={48} />
                       <h3>No venues found</h3>
-                      <p>
-                        Try adjusting your filters or searching in a
-                        different area.
-                      </p>
+                      <p>Try adjusting your search or exploring another area.</p>
                     </div>
                   )}
                 </div>
