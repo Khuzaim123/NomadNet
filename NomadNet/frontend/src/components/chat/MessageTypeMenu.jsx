@@ -4,7 +4,7 @@ import MarketplaceItemSelector from './MarketplaceItemSelector';
 import CheckInSender from './CheckInSender';
 import LocationSender from './LocationSender';
 import ImageUploader from './ImageUploader';
-import './MessageTypeMenu.css';
+import '../../styles/MessageTypeMenu.css';
 
 const MessageTypeMenu = ({ onClose, onSelect }) => {
   const [activeModal, setActiveModal] = useState(null);
@@ -22,7 +22,7 @@ const MessageTypeMenu = ({ onClose, onSelect }) => {
   const menuItems = [
     {
       id: 'image',
-      icon: '📷',
+      icon: '',
       label: 'Image',
       description: 'Send a photo',
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -30,7 +30,7 @@ const MessageTypeMenu = ({ onClose, onSelect }) => {
     },
     {
       id: 'marketplace',
-      icon: '🏪',
+      icon: '',
       label: 'Marketplace',
       description: 'Share or offer an item',
       gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
@@ -38,7 +38,7 @@ const MessageTypeMenu = ({ onClose, onSelect }) => {
     },
     {
       id: 'checkin',
-      icon: '📍',
+      icon: '',
       label: 'Check-in',
       description: 'Share location or invite',
       gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
@@ -46,7 +46,7 @@ const MessageTypeMenu = ({ onClose, onSelect }) => {
     },
     {
       id: 'location',
-      icon: '🗺️',
+      icon: '',
       label: 'Location',
       description: 'Share your location',
       gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
