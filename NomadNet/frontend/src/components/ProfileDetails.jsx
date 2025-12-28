@@ -12,7 +12,8 @@ import {
   FiCamera,
   FiLogOut,
   FiSlash,
-  FiAlertTriangle
+  FiAlertTriangle,
+  FiKey
 } from 'react-icons/fi';
 
 const ProfileDetails = ({
@@ -21,6 +22,7 @@ const ProfileDetails = ({
   isOwner,
   onEditProfile,
   onAvatarClick,
+  onChangePassword,
   onLogout,
   onBlock,
   onReport
@@ -93,9 +95,8 @@ const ProfileDetails = ({
       <div className="profile-card main-profile-card">
         <div className="profile-main-top">
           <div
-            className={`profile-avatar-wrapper ${
-              isOwner && onAvatarClick ? 'clickable' : ''
-            }`}
+            className={`profile-avatar-wrapper ${isOwner && onAvatarClick ? 'clickable' : ''
+              }`}
             onClick={isOwner && onAvatarClick ? onAvatarClick : undefined}
           >
             <img
@@ -140,6 +141,16 @@ const ProfileDetails = ({
                 >
                   <FiEdit2 size={16} />
                   Edit Profile
+                </button>
+              )}
+              {onChangePassword && (
+                <button
+                  type="button"
+                  className="profile-action-btn"
+                  onClick={onChangePassword}
+                >
+                  <FiKey size={16} />
+                  Change Password
                 </button>
               )}
               {onLogout && (

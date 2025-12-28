@@ -23,6 +23,7 @@ import useGeolocation from '../hooks/useGeolocation';
 import socketService from '../services/socketService';
 import { getNearbyAll } from '../services/mapService';
 import { getToken } from '../utils/authUtils';
+import { generateDummyUsers, generateDummyVenues } from '../services/dummyDataService';
 
 import '../styles/venuePage.css';
 import '../styles/dashboard.css';
@@ -67,10 +68,8 @@ const DashboardPage = () => {
     } else if (geoError) {
       console.error('❌ Geolocation error:', geoError);
       setLocationError(geoError);
-      // Fallback to default (e.g. NYC) if we don't have any location yet
-      if (!userLocation) {
-        setUserLocation({ longitude: -74.006, latitude: 40.7128 });
-      }
+      // Don't set a fallback location - let userLocation remain null
+      // This ensures we only show venues when we have the user's REAL location
     }
   }, [location, geoError]);
 
@@ -106,24 +105,46 @@ useEffect(() => {
         .map(key => (key === 'checkIns' ? 'checkins' : key))
         .join(',');
 
-      const data = await getNearbyAll(
-        userLocation.longitude,
-        userLocation.latitude,
-        radius,
-        types,
-        50,
-        {
-          category: filters.category,
-          amenities: filters.amenities,
-          minRating: filters.minRating
-        }
-      );
+        const data = await getNearbyAll(
+          userLocation.longitude,
+          userLocation.latitude,
+          radius,
+          types,
+          50
+        );
 
-      setNearbyData(data.data);
-    } catch (error) {
-      console.error('❌ Error fetching nearby data:', error);
-    }
-  };
+        // Generate dummy users near the current location
+        const dummyUsers = generateDummyUsers(
+          userLocation.longitude,
+          userLocation.latitude,
+          8, // Generate 8 dummy users
+          500 // Within 500 meters
+        );
+
+        // Generate dummy venues near the current location
+        const dummyVenues = generateDummyVenues(
+          userLocation.longitude,
+          userLocation.latitude,
+          12, // Generate 12 dummy venues
+          1000 // Within 1000 meters
+        );
+
+        // Merge dummy users and venues with real data
+        const mergedData = {
+          ...data.data,
+          users: [...(data.data.users || []), ...dummyUsers],
+          venues: [...(data.data.venues || []), ...dummyVenues]
+        };
+
+        console.log(`📍 Added ${dummyUsers.length} dummy users to the map`);
+        console.log(`🏢 Added ${dummyVenues.length} dummy venues to the map`);
+
+        // Expecting data.data = { users, venues, marketplace, checkIns }
+        setNearbyData(mergedData);
+      } catch (error) {
+        console.error('❌ Error fetching nearby data:', error);
+      }
+    };
 
   fetchNearbyData();
 }, [userLocation, radius, mapFilters, filters]);
@@ -273,12 +294,20 @@ useEffect(() => {
         .includes(searchQuery.toLowerCase())
   );
 
-  // Same UX as before: show "Getting your location..." until geolocation finishes
+  // Same UX as before: show "Getting your location...\" until geolocation finishes
   if (loading) {
     return (
       <div className="dashboard-loading">
         <div className="loading-spinner"></div>
         <p>Getting your location...</p>
+        {locationError && (
+          <div style={{ marginTop: '1rem', color: '#ef4444' }}>
+            <p>{locationError}</p>
+            <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+              Please enable location permissions to see nearby venues
+            </p>
+          </div>
+        )}
       </div>
     );
   }

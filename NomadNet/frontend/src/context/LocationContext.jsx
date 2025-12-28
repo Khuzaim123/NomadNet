@@ -216,6 +216,9 @@ export const LocationProvider = ({ children }) => {
     }, [startTracking, handlePositionUpdate, handlePositionError]);
 
     // Auto-start tracking when user logs in
+    // DISABLED: Pages now handle their own location via useGeolocation hook
+    // This prevents duplicate location requests and confusing error messages
+    /*
     useEffect(() => {
         if (isAuthenticated && !isTracking) {
             const timer = setTimeout(() => {
@@ -226,6 +229,7 @@ export const LocationProvider = ({ children }) => {
             return () => clearTimeout(timer);
         }
     }, [isAuthenticated, isTracking, requestLocationPermission]);
+    */
 
     // Cleanup on unmount or logout
     useEffect(() => {
