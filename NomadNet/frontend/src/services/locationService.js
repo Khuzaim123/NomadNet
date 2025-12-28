@@ -5,7 +5,7 @@ import api from './api';
  * Get current user's location
  */
 export const getMyLocation = async () => {
-    const response = await api.get('/map/my-location');
+    const response = await api.get('/api/map/my-location');
     return response.data;
 };
 
@@ -14,7 +14,7 @@ export const getMyLocation = async () => {
  * @param {Object} locationData - { longitude, latitude, city, country }
  */
 export const updateMyLocation = async (locationData) => {
-    const response = await api.put('/map/my-location', locationData);
+    const response = await api.put('/api/map/my-location', locationData);
     return response.data;
 };
 
@@ -23,7 +23,7 @@ export const updateMyLocation = async (locationData) => {
  * @param {boolean} shareLocation - true to enable, false to disable
  */
 export const toggleShareLocation = async (shareLocation) => {
-    const response = await api.patch('/map/share-location', { shareLocation });
+    const response = await api.patch('/api/map/share-location', { shareLocation });
     return response.data;
 };
 
@@ -37,7 +37,7 @@ export const getUserLocation = async (userId, myCoordinates = null) => {
         ? { longitude: myCoordinates.longitude, latitude: myCoordinates.latitude }
         : {};
 
-    const response = await api.get(`/map/user/${userId}/location`, { params });
+    const response = await api.get(`/api/map/user/${userId}/location`, { params });
     return response.data;
 };
 
@@ -54,7 +54,7 @@ export const getMultipleUsersLocations = async (userIds, myCoordinates = null) =
         body.latitude = myCoordinates.latitude;
     }
 
-    const response = await api.post('/map/users/locations', body);
+    const response = await api.post('/api/map/users/locations', body);
     return response.data;
 };
 

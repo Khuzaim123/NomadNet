@@ -8,7 +8,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 import ChatPage from './pages/ChatPage';
-import { AuthProvider } from './context/AuthContext';
+
 // Marketplace Pages
 import MarketplacePage from './pages/MarketplacePage';
 import CreateListingPage from './pages/CreateListingPage';

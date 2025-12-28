@@ -1,97 +1,64 @@
 // src/services/mapService.js
 import api from './api';
 
-// ======================
-// 🗺️ Map API Service
-// ======================
+/**
+ * Get nearby users, venues, marketplace items, and check-ins.
+ * Combines:
+ *   - /api/map/nearby            (users, marketplace, checkIns)
+ *   - /api/venues/nearby/search  (venues with OSM/Overpass import)
+ */
+export const getNearbyAll = async (
+  longitude,
+  latitude,
+  radius,
+  types,
+  limit,
+  venueFilters = {}
+) => {
+  const typeString = types || 'users,venues,marketplace,checkins';
 
-// Get all nearby items (users, venues, marketplace, check-ins)
-export const getNearbyAll = async (longitude, latitude, radius = 300, types = 'users,venues,marketplace,checkins', limit = 50) => {
-  try {
-    const params = new URLSearchParams({
+  // Call map/nearby for users/marketplace/checkins
+  const mapPromise = api.get('/api/map/nearby', {
+    params: {
       longitude,
       latitude,
       radius,
-      types,
+      types: typeString,
       limit
-    });
+    }
+  });
 
-    const response = await api.get(`/api/map/nearby?${params.toString()}`);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Get nearby all error:', error);
-    throw error;
-  }
-};
+  // Call venues/nearby/search for venues (to trigger OSM import)
+  const venuesPromise = api.get('/api/venues/nearby/search', {
+    params: {
+      longitude,
+      latitude,
+      radius,
+      limit,
+      category: venueFilters.category || undefined,
+      amenities:
+        venueFilters.amenities && venueFilters.amenities.length > 0
+          ? venueFilters.amenities.join(',')
+          : undefined,
+      minRating:
+        venueFilters.minRating && venueFilters.minRating > 0
+          ? venueFilters.minRating
+          : undefined
+    }
+  });
 
-// Get detailed user info for map marker
-export const getUserDetailsForMap = async (userId, longitude = null, latitude = null) => {
-  try {
-    const params = new URLSearchParams();
-    if (longitude) params.append('longitude', longitude);
-    if (latitude) params.append('latitude', latitude);
+  const [mapRes, venuesRes] = await Promise.all([mapPromise, venuesPromise]);
 
-    const queryString = params.toString();
-    const url = `/api/map/user/${userId}/details${queryString ? `?${queryString}` : ''}`;
-    
-    const response = await api.get(url);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Get user details for map error:', error);
-    throw error;
-  }
-};
+  const mapData = mapRes.data?.data || mapRes.data || {};
+  const venuesData =
+    venuesRes.data?.data?.venues || venuesRes.data?.venues || [];
 
-// Get detailed venue info for map marker
-export const getVenueDetailsForMap = async (venueId, longitude = null, latitude = null) => {
-  try {
-    const params = new URLSearchParams();
-    if (longitude) params.append('longitude', longitude);
-    if (latitude) params.append('latitude', latitude);
-
-    const queryString = params.toString();
-    const url = `/api/map/venue/${venueId}/details${queryString ? `?${queryString}` : ''}`;
-    
-    const response = await api.get(url);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Get venue details for map error:', error);
-    throw error;
-  }
-};
-
-// Get detailed marketplace item info for map marker
-export const getMarketplaceDetailsForMap = async (itemId, longitude = null, latitude = null) => {
-  try {
-    const params = new URLSearchParams();
-    if (longitude) params.append('longitude', longitude);
-    if (latitude) params.append('latitude', latitude);
-
-    const queryString = params.toString();
-    const url = `/api/map/marketplace/${itemId}/details${queryString ? `?${queryString}` : ''}`;
-    
-    const response = await api.get(url);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Get marketplace details for map error:', error);
-    throw error;
-  }
-};
-
-// Get detailed check-in info for map marker
-export const getCheckInDetailsForMap = async (checkinId, longitude = null, latitude = null) => {
-  try {
-    const params = new URLSearchParams();
-    if (longitude) params.append('longitude', longitude);
-    if (latitude) params.append('latitude', latitude);
-
-    const queryString = params.toString();
-    const url = `/api/map/checkin/${checkinId}/details${queryString ? `?${queryString}` : ''}`;
-    
-    const response = await api.get(url);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Get check-in details for map error:', error);
-    throw error;
-  }
+  return {
+    data: {
+      users: mapData.users || [],
+      venues: venuesData,
+      marketplace: mapData.marketplace || [],
+      checkIns: mapData.checkIns || []
+    }
+  };
 };

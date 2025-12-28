@@ -9,7 +9,7 @@ console.log("🌐 Loaded Base URL:", baseURL);
 // Create axios instance
 const api = axios.create({
   baseURL,
-  timeout: 15000,
+  timeout: 20000,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
