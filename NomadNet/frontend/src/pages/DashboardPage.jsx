@@ -95,35 +95,38 @@ const DashboardPage = () => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Fetch nearby data (venues + check-ins + users/marketplace via mapService)
-  useEffect(() => {
-    if (!userLocation) return;
+  // AFTER
+useEffect(() => {
+  if (!userLocation) return;
 
-    const fetchNearbyData = async () => {
-      try {
-        const types = Object.keys(mapFilters)
-          .filter(key => mapFilters[key])
-          .map(key => (key === 'checkIns' ? 'checkins' : key))
-          .join(',');
+  const fetchNearbyData = async () => {
+    try {
+      const types = Object.keys(mapFilters)
+        .filter(key => mapFilters[key])
+        .map(key => (key === 'checkIns' ? 'checkins' : key))
+        .join(',');
 
-        const data = await getNearbyAll(
-          userLocation.longitude,
-          userLocation.latitude,
-          radius,
-          types,
-          50
-        );
+      const data = await getNearbyAll(
+        userLocation.longitude,
+        userLocation.latitude,
+        radius,
+        types,
+        50,
+        {
+          category: filters.category,
+          amenities: filters.amenities,
+          minRating: filters.minRating
+        }
+      );
 
-        // Expecting data.data = { users, venues, marketplace, checkIns }
-        setNearbyData(data.data);
-      } catch (error) {
-        console.error('❌ Error fetching nearby data:', error);
-      }
-    };
+      setNearbyData(data.data);
+    } catch (error) {
+      console.error('❌ Error fetching nearby data:', error);
+    }
+  };
 
-    fetchNearbyData();
-  }, [userLocation, radius, mapFilters]);
-
+  fetchNearbyData();
+}, [userLocation, radius, mapFilters, filters]);
   // ---------- Socket.IO for realtime updates ----------
   useEffect(() => {
     if (!userLocation) return;

@@ -126,59 +126,54 @@ const AuthPage = () => {
   }, [otpData.resendCooldown]);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!loginData.email || !loginData.password) {
-      showAlert('Please fill in all fields', 'error');
+  // ... your validation logic ...
+
+  setLoading(true);
+  console.log('🟢 handleLogin: starting login');
+
+  try {
+    console.log('🟢 handleLogin: calling authService.login');
+    const response = await login(loginData.email, loginData.password);
+    console.log('🟢 handleLogin: login returned:', response);
+
+    if (response.status === 'error' && response.requiresOTP) {
+      // ... existing OTP logic ...
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(loginData.email)) {
-      showAlert('Please enter a valid email address', 'error');
-      return;
+    const loggedInUser = response?.data?.user || response?.user;
+    const token = response?.data?.token || response?.token;
+
+    console.log('🟢 handleLogin: extracted user:', loggedInUser);
+    console.log('🟢 handleLogin: extracted token:', token);
+
+    if (!loggedInUser?.username || !token) {
+      console.error('❌ Invalid login response structure:', response);
+      throw new Error('Invalid login response from server.');
     }
 
-    setLoading(true);
+    storeAuth(token, loggedInUser, loginData.rememberMe);
+    showAlert('Login successful! Redirecting...', 'success');
 
-    try {
-      const response = await login(loginData.email, loginData.password);
-      console.log('🔍 Login response:', response);
-
-      if (response.status === 'error' && response.requiresOTP) {
-        setOtpData({ email: loginData.email, otp: '', resendCooldown: 60 });
-        setShowOTPVerification(true);
-        showAlert('Please verify your email first', 'error');
-        return;
-      }
-
-      // ✅ Handle multiple response structures
-      const loggedInUser = response?.data?.user || response?.user;
-      const token = response?.data?.token || response?.token;
-
-      console.log('🔍 Extracted user:', loggedInUser);
-      console.log('🔍 Extracted token:', token);
-
-      if (!loggedInUser?.username) {
-        console.error('❌ Invalid response structure:', response);
-        throw new Error('Invalid login response from server.');
-      }
-
-      storeAuth(token, loggedInUser, loginData.rememberMe);
-      showAlert('Login successful! Redirecting...', 'success');
-
-      setTimeout(() => {
-        console.log('✅ Navigating to:', `/profile/${loggedInUser.username}`);
-        navigate(`/profile/${loggedInUser.username}`);
-      }, 1000);
-
-    } catch (error) {
-      console.error('❌ Login error:', error);
-      showAlert(error?.response?.data?.message || error.message || 'Login failed. Please check your credentials.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+    setTimeout(() => {
+      console.log('✅ Navigating to:', `/profile/${loggedInUser.username}`);
+      navigate(`/profile/${loggedInUser.username}`);
+    }, 1000);
+  } catch (error) {
+    console.error('❌ handleLogin catch, error:', error);
+    showAlert(
+      error?.response?.data?.message ||
+        error.message ||
+        'Login failed. Please check your credentials.',
+      'error'
+    );
+  } finally {
+    console.log('🟢 handleLogin: finally, setLoading(false)');
+    setLoading(false);
+  }
+};
 
   const handleSignup = async (e) => {
     e.preventDefault();

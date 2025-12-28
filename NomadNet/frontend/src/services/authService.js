@@ -7,16 +7,16 @@ const API_URL = api.defaults.baseURL;
 console.log('🔗 API URL:', API_URL);
 console.log('🌍 Current page:', window.location.href);
 
-// Test connection immediately
-(async () => {
-  try {
-    console.log('Testing backend connection...');
-    const res = await api.get('/api/health');
-    console.log('Backend is online!', res.data);
-  } catch (error) {
-    console.error('Backend connection failed!', error.message);
-  }
-})();
+// Test connection immediately (DISABLED for now to reduce noise / timeouts)
+// (async () => {
+//   try {
+//     console.log('Testing backend connection...');
+//     const res = await api.get('/api/health');
+//     console.log('Backend is online!', res.data);
+//   } catch (error) {
+//     console.error('Backend connection failed!', error.message);
+//   }
+// })();
 
 // Helper function for fetch with debugging
 const fetchWithDebug = async (url, options = {}) => {
