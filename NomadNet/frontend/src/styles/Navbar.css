@@ -19,6 +19,7 @@
   justify-content: space-between;
   padding: 0 1.5rem;
   gap: 2rem;
+  position: relative; /* <<< important so mobile dropdown is positioned correctly */
 }
 
 .navbar-loading {
@@ -64,8 +65,9 @@
    NAVIGATION LINKS
    =================================== */
 
+/* Base: show links as a row (icons only on small screens) */
 .navbar-links {
-  display: none;
+  display: flex;          /* <<< was display: none */
   align-items: center;
   gap: 0.5rem;
   flex: 1;
@@ -100,6 +102,7 @@
   flex-shrink: 0;
 }
 
+/* Hide text labels by default (small screens) */
 .nav-link span {
   display: none;
 }
@@ -109,6 +112,7 @@
     display: flex;
   }
 
+  /* Show labels on tablet/desktop */
   .nav-link span {
     display: block;
   }
@@ -149,6 +153,11 @@
 
 /* Mobile menu dropdown */
 @media (max-width: 767px) {
+  /* Hide links in top bar until menu is opened */
+  .navbar-links {
+    display: none; /* <<< moved here instead of global */
+  }
+
   .navbar-links.active {
     display: flex;
     flex-direction: column;
@@ -169,6 +178,7 @@
     justify-content: flex-start;
   }
 
+  /* Show labels inside the opened mobile menu */
   .nav-link span {
     display: block;
   }
