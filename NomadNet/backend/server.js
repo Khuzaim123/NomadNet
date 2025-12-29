@@ -21,7 +21,7 @@ const io = new Server(server, {
   cors: {
     origin: process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(',')
-      : ['http://localhost:3000', 'http://localhost:5173'],
+      : ['http://localhost:3000', 'http://localhost:5173' , 'https://nomad-net.netlify.app'],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
   },
