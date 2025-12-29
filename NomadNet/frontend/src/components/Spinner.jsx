@@ -5,7 +5,7 @@ import '../styles/spinner.css'; // optional CSS for animation
 const Spinner = () => {
   return (
     <div className="spinner">
-      Loading...
+      
     </div>
   );
 };
