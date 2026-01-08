@@ -31,7 +31,7 @@ const CheckInSchema = new mongoose.Schema({
   visibility: {
     type: String,
     enum: ['public', 'connections', 'private'],
-    default: 'public'
+    default: 'publi5c'
   },
   expiresAt: {
     type: Date,
