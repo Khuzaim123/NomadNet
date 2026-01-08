@@ -30,7 +30,7 @@ const CreateListingPage = () => {
       amount: '',
       currency: 'USD'
     },
-    deliveryOptions: ['pickup']
+    deliveryOption: 'pickup'
   });
 
   const [photos, setPhotos] = useState([]);
@@ -57,20 +57,10 @@ const CreateListingPage = () => {
   };
 
   const handleDeliveryOptionChange = (option) => {
-    setFormData(prev => {
-      const currentOptions = prev.deliveryOptions;
-      if (currentOptions.includes(option)) {
-        return {
-          ...prev,
-          deliveryOptions: currentOptions.filter(opt => opt !== option)
-        };
-      } else {
-        return {
-          ...prev,
-          deliveryOptions: [...currentOptions, option]
-        };
-      }
-    });
+    setFormData(prev => ({
+      ...prev,
+      deliveryOption: option
+    }));
   };
 
   const handlePhotoChange = (e) => {
@@ -135,8 +125,8 @@ const CreateListingPage = () => {
       setError('Price is required for paid listings');
       return;
     }
-    if (formData.deliveryOptions.length === 0) {
-      setError('At least one delivery option is required');
+    if (!formData.deliveryOption) {
+      setError('Delivery option is required');
       return;
     }
 
@@ -149,7 +139,7 @@ const CreateListingPage = () => {
         description: formData.description.trim(),
         category: formData.category,
         priceType: formData.priceType,
-        deliveryOptions: formData.deliveryOptions,
+        deliveryOptions: [formData.deliveryOption],
         photos: photos
       };
 
@@ -383,16 +373,18 @@ const CreateListingPage = () => {
 
             {/* Delivery Options */}
             <div className="form-section">
-              <h3 className="form-section-title">Delivery Options *</h3>
+              <h3 className="form-section-title">Delivery Option *</h3>
               <div className="delivery-options">
                 {DELIVERY_OPTIONS.map(option => (
-                  <label key={option.value} className="checkbox-option">
+                  <label key={option.value} className="type-option">
                     <input
-                      type="checkbox"
-                      checked={formData.deliveryOptions.includes(option.value)}
+                      type="radio"
+                      name="deliveryOption"
+                      value={option.value}
+                      checked={formData.deliveryOption === option.value}
                       onChange={() => handleDeliveryOptionChange(option.value)}
                     />
-                    <span>{option.label}</span>
+                    <span className="type-label">{option.label}</span>
                   </label>
                 ))}
               </div>
